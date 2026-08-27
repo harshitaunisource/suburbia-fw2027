@@ -10,7 +10,7 @@ python-pptx==1.0.2
 python-dotenv==1.0.1
 # Optional -- only needed if AI_PROVIDER=anthropic (see .env.example):
 anthropic==0.39.0
-
+psycopg2-binary>=2.9.9
 # NOTE: Postgres support (psycopg2-binary) is intentionally NOT in this
 # file. The project defaults to a local SQLite file (see database.py /
 # .env.example) which needs zero extra setup. If/when you switch to
