@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://suburbia-fw2027-production.up.railway.app/api/:path*" },
+    { "source": "/storage/:path*", "destination": "https://suburbia-fw2027-production.up.railway.app/storage/:path*" }
+  ]
+}
