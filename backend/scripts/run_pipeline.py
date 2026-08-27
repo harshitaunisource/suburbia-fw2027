@@ -113,6 +113,22 @@ def main():
                 except Exception as e:
                     print(f"  CRASHED (unexpected, not a normal ScraperError): {e}")
                     summary.append((source, category, "crashed", 0))
+                    # A dropped/broken database connection (e.g. Neon's
+                    # free-tier pooler closing an idle connection mid-run
+                    # -- confirmed live during a long image-download
+                    # loop) leaves this Session in a permanently broken
+                    # state; every query on it afterwards fails too,
+                    # cascading a single transient blip into every
+                    # remaining source/category failing for the rest of
+                    # this run. Rolling back and swapping in a fresh
+                    # Session bounds the damage to just this one
+                    # iteration instead.
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    db.close()
+                    db = SessionLocal()
 
     print("\n" + "=" * 70)
     print("PHASE 5: AI ATTRIBUTE EXTRACTION")

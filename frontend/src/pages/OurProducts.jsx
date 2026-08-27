@@ -1,5 +1,20 @@
 import { useEffect, useState } from "react";
 
+import { useEffect, useState } from "react";
+
+function imageSrc(imagePath) {
+  if (!imagePath) return null;
+  // Normalize backslashes first -- see Products.jsx's imageSrc for why
+  // (rows scraped on Windows before a since-fixed backend bug store
+  // "storage\products\..." instead of "storage/products/..."). The
+  // previous split("storage/") approach here silently broke on those
+  // rows since it only ever matched the forward-slash form.
+  const normalized = imagePath.replace(/\\/g, "/");
+  const idx = normalized.indexOf("storage/");
+  return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
+}
+
+
 const EMPTY = {
   product_name: "",
   our_product_code: "",
@@ -142,7 +157,7 @@ export default function OurProducts() {
           <div key={p.id} className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
             <div className="aspect-square bg-neutral-100 flex items-center justify-center overflow-hidden relative">
               {p.image_path ? (
-                <img src={`/storage/${p.image_path.split("storage/")[1] || p.image_path}`} alt={p.product_name} className="object-cover w-full h-full" />
+                <img src={imageSrc(p.image_path)} alt={p.product_name} className="object-cover w-full h-full" />
               ) : (
                 <span className="text-neutral-400 text-xs">No image — upload below</span>
               )}

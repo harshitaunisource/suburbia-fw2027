@@ -108,6 +108,7 @@ class PlaywrightScraper:
         scroll: bool = False,
         check_blocked: bool = True,
         referer: Optional[str] = None,
+        debug_save_path: Optional[str] = None,
     ) -> str:
         """Navigates to `url` in a real browser and returns the fully
         rendered DOM's outerHTML.
@@ -116,19 +117,15 @@ class PlaywrightScraper:
             "loaded". Strongly preferred over a blind wait_ms.
         wait_ms: fallback/extra settle time after navigation.
         scroll: set True for infinite-scroll category pages.
-        check_blocked: if True, raise ScraperError when the returned page
-            text matches a known CAPTCHA/block marker instead of silently
-            returning challenge-page HTML to the caller's parser. See
-            BLOCK_TEXT_MARKERS -- deliberately narrow to avoid false
-            positives on normal pages that merely mention a related word.
-        referer: sets the Referer header for this navigation. Several
-            sites' bot-mitigation specifically flags direct navigation to
-            a deep product-page URL with no referer as bot-like (a real
-            shopper always arrives via a category/search page click) --
-            confirmed live on oldnavy.mx, where the category page loaded
-            fine but every single product page 403'd on a referer-less
-            direct .goto(). Pass the category URL here when scraping
-            product pages discovered from that category.
+        debug_save_path: if given, writes the raw rendered HTML to this
+            local file path (relative to the current working directory)
+            regardless of success/failure -- this is the fastest way to
+            get real ground truth when a scraper keeps finding 0 links
+            despite a regex already confirmed against real, verified
+            product URLs (as happened live on Boohoo): open the saved
+            file, search it for "/product" (or whatever pattern you'd
+            expect), and paste back what's actually there instead of
+            guessing again blind.
         """
         page = self.context.new_page()
         try:
@@ -175,6 +172,14 @@ class PlaywrightScraper:
                     f"Could not read page content for {url} "
                     f"(page may have navigated away unexpectedly): {e}"
                 )
+
+            if debug_save_path:
+                try:
+                    with open(debug_save_path, "w", encoding="utf-8") as f:
+                        f.write(html)
+                    print(f"[debug] saved rendered HTML ({len(html)} chars) to {debug_save_path}", flush=True)
+                except Exception as e:
+                    print(f"[debug] could not save HTML to {debug_save_path}: {e}", flush=True)
 
             if check_blocked:
                 lowered = html.lower()

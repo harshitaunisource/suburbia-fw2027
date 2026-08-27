@@ -40,6 +40,38 @@ def meta_content(soup: BeautifulSoup, prop: str) -> Optional[str]:
     el = soup.select_one(f"meta[property='{prop}']") or soup.select_one(f"meta[name='{prop}']")
     return el["content"].strip() if el and el.get("content") else None
 
+# Substrings that indicate og:image resolved to a generic placeholder
+# instead of a real product photo -- confirmed live on Primark, where
+# every single product's og:image was literally
+# "https://www.primark.com/assets/images/no-image.png" (which itself
+# 403'd on download, but the deeper bug was extracting the wrong URL
+# entirely, not a permissions problem).
+PLACEHOLDER_IMAGE_MARKERS = ["no-image", "placeholder", "default-image", "noimage"]
+
+
+def extract_jsonld_image(soup: BeautifulSoup) -> Optional[str]:
+    """Falls back to a page's embedded schema.org Product JSON-LD data
+    for the real image, when og:image is missing or a known placeholder.
+    Most modern e-commerce sites populate this block with real data even
+    when og:meta tags are stale/generic (as confirmed on Primark)."""
+    import json as _json
+
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = _json.loads(script.string or "")
+        except Exception:
+            continue
+        candidates = data if isinstance(data, list) else [data]
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            img = item.get("image")
+            if isinstance(img, list) and img:
+                return img[0]
+            if isinstance(img, str) and img:
+                return img
+    return None
+
 
 def clean_title(title: Optional[str], separators: tuple[str, ...] = ("|", " - ")) -> Optional[str]:
     """Strips common site-name suffixes off an <title>/og:title value,
@@ -120,6 +152,13 @@ def parse_generic_product(
         )
 
     main_image = meta_content(soup, "og:image")
+    if not main_image or any(marker in main_image.lower() for marker in PLACEHOLDER_IMAGE_MARKERS):
+        # og:image missing or a known placeholder (confirmed live on
+        # Primark) -- try the page's structured Product data instead,
+        # which usually has the real photo even when og:meta doesn't.
+        jsonld_image = extract_jsonld_image(soup)
+        if jsonld_image:
+            main_image = jsonld_image
     description = meta_content(soup, "og:description")
 
     prices = extract_prices_near(text, anchor=name[:30])

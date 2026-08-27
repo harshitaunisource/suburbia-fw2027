@@ -73,9 +73,19 @@ def _add_text(slide, left, top, width, height, text, size=18, bold=False, color=
 def _resolve_image_path(path: Optional[str]) -> Optional[Path]:
     if not path:
         return None
-    p = Path(path)
+    # Normalize backslashes to forward slashes BEFORE constructing a
+    # Path: this service runs on Railway (Linux), and Python's pathlib
+    # does not cross-translate Windows-style separators -- a value like
+    # "storage\products\zara\sweaters\x.jpg" (written by a scraper run
+    # on Windows before a since-fixed backend bug) gets interpreted on
+    # Linux as one single filename containing literal backslash
+    # characters, not nested folders, so it silently never resolves and
+    # the PPT falls back to the "No image yet" placeholder. This is the
+    # same root cause already fixed for the frontend's image display.
+    normalized = path.replace("\\", "/")
+    p = Path(normalized)
     if not p.is_absolute():
-        p = STORAGE_ROOT.parent / path
+        p = STORAGE_ROOT.parent / normalized
     return p if p.exists() else None
 
 

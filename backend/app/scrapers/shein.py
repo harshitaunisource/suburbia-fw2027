@@ -38,7 +38,12 @@ from app.scrapers.playwright_base import PlaywrightScraper, ScraperError
 CATEGORY_URL_SWEATERS = "https://www.shein.com.mx/category/Sweaters-sc-00831455.html"
 CATEGORY_URL_BLOUSES = "https://www.shein.com.mx/style/Women-Blouses-sc-00122967.html"
 
-PDP_LINK_RE = re.compile(r'href="([^"]*-p-\d+-cat-\d+\.html[^"]*)"')
+# CONFIRMED via real indexed product pages (search results): SHEIN's
+# real product URL has NO "-cat-" segment at all -- the earlier guess
+# required one, which is exactly why it matched zero real links:
+#   https://us.shein.com/Wool-Mix-Oversized-Sweater-p-5004212.html
+#   https://us.shein.com/Women's-Off-Shoulder-Sweater-p-25492925.html
+PDP_LINK_RE = re.compile(r'href="([^"]*-p-\d+\.html[^"]*)"')
 
 CATEGORY_MAP = {
     "sweater": "sweaters",

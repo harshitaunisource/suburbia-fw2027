@@ -38,9 +38,12 @@ from app.scrapers.playwright_base import PlaywrightScraper, ScraperError
 CATEGORY_URL_SWEATERS = "https://oldnavy.gap.com/browse/women/sweaters-and-cardigans?cid=20408#department=136"
 CATEGORY_URL_BLOUSES = "https://oldnavy.gap.com/shop/womens-fashion-blouses-0aaz22b"
 
-# UNCONFIRMED -- Gap Inc sites commonly use a /p/ or /product/ segment
-# with a numeric SKU-like ID; adjust from real printed output on first run.
-PDP_LINK_RE = re.compile(r'href="([^"]*/(?:browse/product|p)/[a-z0-9\-]*\d{5,}[^"]*)"')
+# CONFIRMED via real indexed product pages (search results), replacing
+# the earlier /browse/product or /p/ path guess -- Old Navy's real
+# product URL is a query-string form, not a path segment:
+#   https://oldnavy.gap.com/browse/product.do?pid=842953002
+#   https://oldnavy.gap.com/browse/product.do?pid=894119002
+PDP_LINK_RE = re.compile(r'href="([^"]*browse/product\.do\?pid=\d+[^"]*)"')
 
 CATEGORY_MAP = {
     "sweaters-and-cardigans": "sweaters",

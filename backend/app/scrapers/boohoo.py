@@ -35,11 +35,15 @@ from app.scrapers.playwright_base import PlaywrightScraper, ScraperError
 CATEGORY_URL_SWEATERS = "https://us.boohoo.com/categories/womens-knitwear-jumpers"
 CATEGORY_URL_BLOUSES = "https://www.boohoo.com/categories/womens-tops-shirts-and-blouses"
 
-# Wide net: any .html link containing a product-code-shaped segment
-# (letters+digits, 5+ chars). UNCONFIRMED against real HTML -- adjust
-# once a real category page's printed candidate links have been
-# inspected (see the [boohoo] discovered ... print in scrape_category).
-PDP_LINK_RE = re.compile(r'href="([^"]*/[A-Za-z0-9]{5,}\.html[^"]*)"')
+# CONFIRMED against your real boohoo_sweaters_debug.html dump (2026-08-27):
+# real links look like
+#   href="/product/boohoo-collared-v-neck-knitted-stripe-vest_hzz31207?colour=dark red"
+# The previous version anchored the capture group to end right at the
+# closing quote, which never matched because Boohoo appends a
+# "?colour=..." query string after the SKU -- this version stops the
+# capture right after the SKU and doesn't care what (if anything)
+# follows before the real closing quote.
+PDP_LINK_RE = re.compile(r'href="(/product/[a-z0-9\-]+_[a-z0-9]+)')
 
 CATEGORY_MAP = {
     "knitwear": "sweaters",
@@ -66,7 +70,9 @@ class BoohooScraper(PlaywrightScraper):
         category = self._category_from_url(url)
         currency = _currency_for_url(url)
         print(f"[boohoo] fetching category page ({currency}): {url}", flush=True)
-        html = self.get_rendered_html(url, wait_ms=3000, scroll=True)
+        html = self.get_rendered_html(
+            url, wait_ms=5000, scroll=True, debug_save_path=f"boohoo_{category or 'unknown'}_debug.html"
+        )
 
         raw_links = set(PDP_LINK_RE.findall(html))
         print(f"[boohoo] discovered {len(raw_links)} candidate product links on {url}", flush=True)
