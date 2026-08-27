@@ -1,0 +1,11 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+*.db
+backend/storage/products/*/*.jpg
+backend/storage/products/*/*.png
+backend/storage/catalogue/*.pdf
+.env

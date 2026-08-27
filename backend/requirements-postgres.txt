@@ -1,0 +1,13 @@
+# Install this ONLY if you're switching DATABASE_URL to Postgres:
+#   pip install -r requirements.txt -r requirements-postgres.txt
+#
+# If this fails to build with "pg_config executable not found", it means
+# pip couldn't find a prebuilt wheel for your Python version/platform
+# and is trying to compile from source. Fixes, in order of ease:
+#   1. Upgrade pip first: python -m pip install --upgrade pip
+#   2. Try a newer version:  pip install psycopg2-binary --upgrade
+#   3. Install PostgreSQL locally (which provides pg_config) from
+#      https://www.postgresql.org/download/, add its bin/ folder to PATH
+#   4. Or just stick with SQLite (the default) -- most of this project
+#      works fine on SQLite for development and even fairly large catalogs.
+psycopg2-binary>=2.9.9

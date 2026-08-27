@@ -1,0 +1,21 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.35
+pydantic==2.9.2
+httpx==0.27.2
+beautifulsoup4==4.12.3
+playwright==1.47.0
+python-multipart==0.0.9
+python-pptx==1.0.2
+python-dotenv==1.0.1
+# Optional -- only needed if AI_PROVIDER=anthropic (see .env.example):
+anthropic==0.39.0
+
+# NOTE: Postgres support (psycopg2-binary) is intentionally NOT in this
+# file. The project defaults to a local SQLite file (see database.py /
+# .env.example) which needs zero extra setup. If/when you switch to
+# Postgres, install requirements-postgres.txt as well -- see the
+# "Switching to Postgres" section in README.md. psycopg2-binary only
+# ships prebuilt wheels for certain Python versions; if it tries to
+# compile from source and fails (missing pg_config), you either have a
+# newer/older Python than it has a wheel for, or you don't need it yet.
