@@ -105,11 +105,19 @@ class CAndAScraper(BaseScraper):
         # may silently under-count -- compare against the "(N)" result
         # count shown on the page before trusting a large category's totals.
 
+        total = len(product_urls)
+        print(f"[c_and_a] found {total} product URLs -- scraping each one now...", flush=True)
         products: list[ScrapedProduct] = []
-        for purl in product_urls:
+        for i, purl in enumerate(product_urls, start=1):
             try:
-                products.append(self.scrape_product(purl, category_hint=category))
-            except ScraperError:
+                product = self.scrape_product(purl, category_hint=category)
+                products.append(product)
+                print(f"[c_and_a] ({i}/{total}) OK: {product.product_name}", flush=True)
+            except ScraperError as e:
+                print(f"[c_and_a] ({i}/{total}) SKIP: {purl} -- {e}", flush=True)
+                continue
+            except Exception as e:
+                print(f"[c_and_a] ({i}/{total}) SKIP (unexpected): {purl} -- {e}", flush=True)
                 continue
         return products
 

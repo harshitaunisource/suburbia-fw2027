@@ -1,26 +1,32 @@
 """
-Phase 10: Buyer Catalogue generator (spec sections 16-18) -- now produces
-a PowerPoint deck (per your workflow: shortlisted Opportunity -> pick the
-closest real competitor product -> straight into the deck) instead of a
-PDF built from hand-entered products.
+Buyer Catalogue generator -- produces a PowerPoint deck matching the
+reference layout: multiple products per slide, side by side, each with
+its photo, composition, a short description, and price -- no brand
+name, no sourcing labels, nothing beyond what a buyer needs to see.
 
-IP / COPYRIGHT NOTE (read before sending anything this generates to an
-external buyer): when a catalogue entry was created by picking a
-competitor's own product as a stand-in (via
-POST /api/catalogue/products/from-product), its photo is someone else's
-product photography, not Suburbia's. This generator will still place
-that image on the slide -- your call, you asked for speed over waiting
-for original photography -- but it stamps a visible
-"REFERENCE -- competitor sourced" label directly on the image so nobody
-downstream mistakes it for an approved Suburbia product photo. Swap in a
-real photo via the Our Products page (upload -> OUR_PRODUCT kind) before
-this goes external, and the label disappears automatically.
+IMPORTANT CHANGE (2026-08-31): earlier versions of this generator
+stamped a "REFERENCE -- competitor sourced" label on any image copied in
+from a competitor product, specifically so nobody could mistake it for
+Suburbia's own approved photography. That label has been removed at
+explicit request. This means a deck built from competitor reference
+images (via the "Suggest Products" workflow) will now look visually
+identical to one built entirely from Suburbia's own original
+photography -- there is no longer any visual indicator in the output
+file distinguishing the two. This was a deliberate decision made by the
+project owner, not a default -- flagging it here once so the reasoning
+is on record, not to relitigate it.
+
+CURRENCY FIX (2026-08-31): previously hardcoded "$" regardless of the
+product's actual currency -- confirmed live to have mislabeled Zara's
+INR prices as dollars. Every price now renders with its own stored
+currency code explicitly (e.g. "MXN 450.00", "GBP 32.00"), never an
+assumed symbol.
 
 This module only ever reads from CatalogueProduct rows with
 approved=True. It never touches Product, ProductAttributes, or
-ProductOpportunity data directly, so competitor prices, URLs, or
-internal opportunity scores can't leak into the deck -- only whatever a
-CatalogueProduct row explicitly carries (spec section 17).
+ProductOpportunity data directly, so internal opportunity scores or raw
+competitor analytics can't leak into the deck -- only whatever a
+CatalogueProduct row explicitly carries.
 """
 from __future__ import annotations
 
@@ -33,30 +39,34 @@ from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Emu, Inches, Pt
+from pptx.util import Inches, Pt
 from sqlalchemy.orm import Session
 
-from app.models import CatalogueProduct, ImageKind
+from app.models import CatalogueProduct
 from app.scrapers.base import STORAGE_ROOT
 
 OUTPUT_DIR = Path(os.getenv("CATALOGUE_OUTPUT_DIR", STORAGE_ROOT / "catalogue"))
 
-# 16:9 widescreen, matches modern PowerPoint default
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
 
 CHARCOAL = RGBColor(0x1A, 0x1A, 0x1A)
 MUTED = RGBColor(0x6B, 0x6B, 0x6B)
-WARN = RGBColor(0xB4, 0x3A, 0x1F)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-BG = RGBColor(0xFA, 0xFA, 0xFA)
+
+PRODUCTS_PER_SLIDE = 3
+COLUMN_WIDTH = Inches(3.9)
+COLUMN_GAP = Inches(0.35)
+IMAGE_HEIGHT = Inches(5.2)
+LEFT_MARGIN = Inches(0.5)
+TOP_MARGIN = Inches(0.6)
 
 
 def _blank_slide(prs: Presentation):
-    return prs.slides.add_slide(prs.slide_layouts[6])  # 6 = fully blank layout
+    return prs.slides.add_slide(prs.slide_layouts[6])
 
 
-def _add_text(slide, left, top, width, height, text, size=18, bold=False, color=CHARCOAL, align=PP_ALIGN.LEFT):
+def _add_text(slide, left, top, width, height, text, size=14, bold=False, color=CHARCOAL, align=PP_ALIGN.LEFT):
     box = slide.shapes.add_textbox(left, top, width, height)
     tf = box.text_frame
     tf.word_wrap = True
@@ -75,18 +85,69 @@ def _resolve_image_path(path: Optional[str]) -> Optional[Path]:
         return None
     # Normalize backslashes to forward slashes BEFORE constructing a
     # Path: this service runs on Railway (Linux), and Python's pathlib
-    # does not cross-translate Windows-style separators -- a value like
-    # "storage\products\zara\sweaters\x.jpg" (written by a scraper run
-    # on Windows before a since-fixed backend bug) gets interpreted on
-    # Linux as one single filename containing literal backslash
-    # characters, not nested folders, so it silently never resolves and
-    # the PPT falls back to the "No image yet" placeholder. This is the
-    # same root cause already fixed for the frontend's image display.
+    # does not cross-translate Windows-style separators.
     normalized = path.replace("\\", "/")
     p = Path(normalized)
     if not p.is_absolute():
         p = STORAGE_ROOT.parent / normalized
     return p if p.exists() else None
+
+
+def _format_price(product: CatalogueProduct) -> Optional[str]:
+    if not product.target_price:
+        return None
+    currency = product.currency or "USD"
+    return f"Target Price: {currency} {product.target_price:,.2f}"
+
+
+def _draw_product_column(slide, product: CatalogueProduct, col_index: int):
+    left = LEFT_MARGIN + col_index * (COLUMN_WIDTH + COLUMN_GAP)
+
+    img_path = _resolve_image_path(product.image_path)
+    if img_path:
+        slide.shapes.add_picture(str(img_path), left, TOP_MARGIN, width=COLUMN_WIDTH, height=IMAGE_HEIGHT)
+    else:
+        placeholder = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, TOP_MARGIN, COLUMN_WIDTH, IMAGE_HEIGHT)
+        placeholder.fill.solid()
+        placeholder.fill.fore_color.rgb = RGBColor(0xEE, 0xEE, 0xEE)
+        placeholder.line.color.rgb = RGBColor(0xDD, 0xDD, 0xDD)
+        tf = placeholder.text_frame
+        para = tf.paragraphs[0]
+        para.alignment = PP_ALIGN.CENTER
+        run = para.add_run()
+        run.text = "No image yet"
+        run.font.size = Pt(13)
+        run.font.color.rgb = MUTED
+
+    text_top = TOP_MARGIN + IMAGE_HEIGHT + Inches(0.1)
+    lines = []
+
+    # Name, then composition, matching the reference layout's ordering
+    # while still satisfying the explicit requirement that product name
+    # always be shown (the reference photo's bold line reads as a style
+    # description, not a name -- both are included here to be safe).
+    if product.product_name:
+        lines.append((product.product_name, True))
+    if product.fabric:
+        lines.append(("Composition " + product.fabric, False))
+    if product.description:
+        lines.append((product.description, True))
+    price_line = _format_price(product)
+    if price_line:
+        lines.append((price_line, False))
+
+    y = text_top
+    for text, bold in lines:
+        box = slide.shapes.add_textbox(left, y, COLUMN_WIDTH, Inches(0.5))
+        tf = box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        run = p.add_run()
+        run.text = text
+        run.font.size = Pt(13)
+        run.font.bold = bold
+        run.font.color.rgb = CHARCOAL
+        y += Inches(0.35)
 
 
 def generate_catalogue_pptx(
@@ -131,86 +192,19 @@ def generate_catalogue_pptx(
         "into a focused, commercially-ready assortment.",
         size=16,
     )
-
-    sweater_count = sum(1 for p in products if p.category == "sweaters")
-    blouse_count = sum(1 for p in products if p.category == "blouses")
-    colorways = sorted({c.strip() for p in products if p.colorways for c in p.colorways.split(",") if c.strip()})
-
     _add_text(slide, Inches(0.7), Inches(3.3), Inches(11.9), Inches(0.5), "Collection Overview",
                size=22, bold=True)
-    overview_lines = [
-        f"Total Styles: {len(products)}",
-        f"Sweater Styles: {sweater_count}",
-        f"Blouse Styles: {blouse_count}",
-        f"Key Colors: {', '.join(colorways[:8]) if colorways else '—'}",
-    ]
-    _add_text(slide, Inches(0.7), Inches(4.0), Inches(11.9), Inches(2.5), "\n".join(overview_lines), size=15)
+    _add_text(slide, Inches(0.7), Inches(4.0), Inches(11.9), Inches(0.5),
+               f"Total Styles: {len(products)}", size=15)
 
     # ------------------------------------------------------------ product slides
-    for p in products:
+    # Grouped 3-per-slide, matching the reference layout, instead of one
+    # full-slide product at a time.
+    for i in range(0, len(products), PRODUCTS_PER_SLIDE):
+        chunk = products[i:i + PRODUCTS_PER_SLIDE]
         slide = _blank_slide(prs)
-
-        img_path = _resolve_image_path(p.image_path)
-        if img_path:
-            pic = slide.shapes.add_picture(str(img_path), Inches(0.7), Inches(0.7), height=Inches(5.6))
-            if p.image_kind == ImageKind.COMPETITOR:
-                # Visible, unmissable label -- this image is someone
-                # else's product photography, kept here only because it
-                # was explicitly chosen as a fast reference stand-in
-                # (see the from-product endpoint's docstring). Swapping
-                # in a real photo via Our Products removes this.
-                label_top = pic.top + pic.height - Inches(0.45)
-                label = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, pic.left, label_top, pic.width, Inches(0.45))
-                label.fill.solid()
-                label.fill.fore_color.rgb = WARN
-                label.line.fill.background()
-                tf = label.text_frame
-                tf.word_wrap = True
-                para = tf.paragraphs[0]
-                para.alignment = PP_ALIGN.CENTER
-                run = para.add_run()
-                run.text = "REFERENCE — competitor sourced"
-                run.font.size = Pt(12)
-                run.font.bold = True
-                run.font.color.rgb = WHITE
-        else:
-            placeholder = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.7), Inches(0.7), Inches(5.6), Inches(5.6))
-            placeholder.fill.solid()
-            placeholder.fill.fore_color.rgb = RGBColor(0xEE, 0xEE, 0xEE)
-            placeholder.line.color.rgb = RGBColor(0xDD, 0xDD, 0xDD)
-            tf = placeholder.text_frame
-            para = tf.paragraphs[0]
-            para.alignment = PP_ALIGN.CENTER
-            run = para.add_run()
-            run.text = "No image yet"
-            run.font.size = Pt(14)
-            run.font.color.rgb = MUTED
-
-        text_left = Inches(6.6)
-        text_width = Inches(6.0)
-        _add_text(slide, text_left, Inches(0.7), text_width, Inches(0.9), p.product_name, size=24, bold=True)
-        if p.our_product_code:
-            _add_text(slide, text_left, Inches(1.5), text_width, Inches(0.4),
-                       f"Code: {p.our_product_code}", size=11, color=MUTED)
-
-        detail_lines = []
-        if p.description:
-            detail_lines.append(p.description)
-            detail_lines.append("")
-        if p.colorways:
-            detail_lines.append(f"Colorways: {p.colorways}")
-        if p.fabric:
-            detail_lines.append(f"Fabric: {p.fabric}")
-        if p.size_range:
-            detail_lines.append(f"Size Range: {p.size_range}")
-        if p.target_price:
-            detail_lines.append(f"Target Price: ${p.target_price:,.2f}")
-        if p.moq:
-            detail_lines.append(f"MOQ: {p.moq}")
-        if p.lead_time:
-            detail_lines.append(f"Lead Time: {p.lead_time}")
-
-        _add_text(slide, text_left, Inches(2.0), text_width, Inches(4.5), "\n".join(detail_lines), size=14)
+        for col_index, product in enumerate(chunk):
+            _draw_product_column(slide, product, col_index)
 
     # ------------------------------------------------------------------ final
     slide = _blank_slide(prs)

@@ -5,14 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
-from app.routers import analytics, attributes, catalogue, dashboard, opportunities, products, scrapers
+from app.routers import analytics, attributes, catalogue, dashboard, generic, opportunities, products, scrapers
 from app.scrapers.base import STORAGE_ROOT
 
 app = FastAPI(title="Suburbia FW2027 Fashion Intelligence API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    # Wide open on purpose: this is an internal team demo/analysis tool
+    # with no user accounts or sensitive external-facing data, and the
+    # frontend's real deployed domain (Vercel) isn't known ahead of time.
+    # If this is ever exposed beyond your own team, tighten this to the
+    # exact Vercel URL instead of "*".
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,6 +37,7 @@ app.include_router(attributes.router)
 app.include_router(analytics.router)
 app.include_router(opportunities.router)
 app.include_router(catalogue.router)
+app.include_router(generic.router)
 
 # Serves downloaded product/catalogue images directly, e.g.
 # GET /storage/products/suburbia/sweaters/SB123.jpg -- so the frontend

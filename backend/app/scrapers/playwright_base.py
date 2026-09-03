@@ -109,6 +109,7 @@ class PlaywrightScraper:
         check_blocked: bool = True,
         referer: Optional[str] = None,
         debug_save_path: Optional[str] = None,
+        wait_until: str = "domcontentloaded",
     ) -> str:
         """Navigates to `url` in a real browser and returns the fully
         rendered DOM's outerHTML.
@@ -117,6 +118,20 @@ class PlaywrightScraper:
             "loaded". Strongly preferred over a blind wait_ms.
         wait_ms: fallback/extra settle time after navigation.
         scroll: set True for infinite-scroll category pages.
+        wait_until: Playwright's navigation-completion condition, passed
+            straight through to page.goto(). Default "domcontentloaded"
+            (fast, works for most server-rendered/mostly-static sites)
+            only waits for the initial HTML document to parse -- it does
+            NOT wait for client-side JavaScript to finish fetching and
+            rendering data. Confirmed live on Textilon (a Vue.js SPA,
+            identified by "data-v-app"/"ant-layout" markup): the category
+            page's product grid is populated by a separate API call after
+            the initial page loads, so "domcontentloaded" captured an
+            empty shell (32KB, no product links) well before that data
+            arrived. Pass "networkidle" for exactly this situation --
+            waits until there's been no network activity for 500ms,
+            which is the standard Playwright signal that an SPA's async
+            data-loading has actually finished.
         debug_save_path: if given, writes the raw rendered HTML to this
             local file path (relative to the current working directory)
             regardless of success/failure -- this is the fastest way to
@@ -126,11 +141,24 @@ class PlaywrightScraper:
             file, search it for "/product" (or whatever pattern you'd
             expect), and paste back what's actually there instead of
             guessing again blind.
+        check_blocked: if True, raise ScraperError when the returned page
+            text matches a known CAPTCHA/block marker instead of silently
+            returning challenge-page HTML to the caller's parser. See
+            BLOCK_TEXT_MARKERS -- deliberately narrow to avoid false
+            positives on normal pages that merely mention a related word.
+        referer: sets the Referer header for this navigation. Several
+            sites' bot-mitigation specifically flags direct navigation to
+            a deep product-page URL with no referer as bot-like (a real
+            shopper always arrives via a category/search page click) --
+            confirmed live on oldnavy.mx, where the category page loaded
+            fine but every single product page 403'd on a referer-less
+            direct .goto(). Pass the category URL here when scraping
+            product pages discovered from that category.
         """
         page = self.context.new_page()
         try:
             resp = page.goto(
-                url, timeout=self.timeout_ms, wait_until="domcontentloaded", referer=referer
+                url, timeout=self.timeout_ms, wait_until=wait_until, referer=referer
             )
             if resp is not None and resp.status == 403:
                 raise ScraperError(

@@ -1,13 +1,16 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
+
+from app.services.pricing import compute_mrp
 
 
 class ProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    product_uid: Optional[str] = None
     source: str
     brand: Optional[str]
     category: Optional[str]
@@ -22,6 +25,18 @@ class ProductOut(BaseModel):
     discount_percentage: Optional[float]
     availability: Optional[str]
     scraped_at: Optional[datetime]
+
+    @computed_field
+    @property
+    def mrp(self) -> Optional[float]:
+        """The ONLY price figure any consumer of this API (frontend,
+        export, PPT) should ever display or use for a business purpose.
+        Never the discounted/sale price -- computed once, server-side,
+        via the single shared compute_mrp() helper, so no frontend page
+        can independently get this wrong again (confirmed live: the
+        Products page previously showed the discounted price as primary
+        with MRP only struck through as an afterthought)."""
+        return compute_mrp(self.price, self.original_price)
 
 
 class ScrapeRunOut(BaseModel):
@@ -87,6 +102,12 @@ class OpportunityStatusUpdate(BaseModel):
 class GenerateOpportunitiesRequest(BaseModel):
     category: str
     top_n: int = 15
+    # Both optional, default to the original Suburbia-vs-everyone
+    # behavior. Set our_source="textilon" and
+    # competitor_sources=["women_secret"] for a specific buyer-vs-
+    # competitor comparison instead.
+    our_source: str = "suburbia"
+    competitor_sources: Optional[list[str]] = None
 
 
 class CatalogueProductIn(BaseModel):
@@ -99,6 +120,7 @@ class CatalogueProductIn(BaseModel):
     fabric: Optional[str] = None
     size_range: Optional[str] = None
     target_price: Optional[float] = None
+    currency: str = "USD"
     moq: Optional[int] = None
     lead_time: Optional[str] = None
     packaging: Optional[str] = None
@@ -121,6 +143,8 @@ class CatalogueProductOut(BaseModel):
     fabric: Optional[str]
     size_range: Optional[str]
     target_price: Optional[float]
+    currency: str
+    source_ref: Optional[str] = None
     moq: Optional[int]
     lead_time: Optional[str]
     packaging: Optional[str]
@@ -135,7 +159,34 @@ class CatalogueProductFromProductRequest(BaseModel):
     product_id: int
 
 
+class CartToggleRequest(BaseModel):
+    """One product's worth of data for the 'Add to PPT' checkbox shown
+    on Products / Search Products / Explore Categories. source_ref is
+    how this stays idempotent -- e.g. "product:123" or
+    "generic_product:456" -- so checking the same box twice toggles it
+    on then off instead of creating duplicate catalogue entries, and a
+    page reload can tell which boxes were already checked (via
+    GET /api/catalogue/cart/refs)."""
+    source_ref: str
+    product_name: str
+    category: Optional[str] = None
+    description: Optional[str] = None
+    image_path: Optional[str] = None
+    colorways: Optional[str] = None
+    fabric: Optional[str] = None
+    size_range: Optional[str] = None
+    target_price: Optional[float] = None
+    currency: str = "USD"
+    notes: Optional[str] = None
+
+
 class GenerateCatalogueRequest(BaseModel):
     collection_title: str = "SUBURBIA MEXICO"
     season_title: str = "FW2027 WOMEN'S COLLECTION"
     market_direction: Optional[str] = None
+    # Once the deck is built, the current batch is done with -- clearing
+    # it is what lets a merchant start selecting a fresh set of products
+    # for the next PPT without deleting the previous batch's entries one
+    # by one. Defaults on; pass false to keep the batch around (e.g. to
+    # regenerate the same deck again without re-selecting anything).
+    clear_after: bool = True

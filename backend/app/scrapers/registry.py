@@ -9,6 +9,10 @@ from app.scrapers.target import TargetScraper
 from app.scrapers.shein import SheinScraper
 from app.scrapers.boohoo import BoohooScraper
 from app.scrapers.asos import AsosScraper
+from app.scrapers.textilon import TextilonScraper
+from app.scrapers.lupo import LupoScraper
+from app.scrapers.women_secret import WomenSecretScraper
+from app.scrapers.lili_pink import LiliPinkScraper
 
 # All 10 sources from the spec are now registered. Confidence level varies
 # a lot by source -- see each module's docstring:
@@ -35,6 +39,10 @@ SCRAPERS: dict[str, type] = {
     "shein": SheinScraper,
     "boohoo": BoohooScraper,
     "asos": AsosScraper,
+    "textilon": TextilonScraper,
+    "lupo": LupoScraper,
+    "women_secret": WomenSecretScraper,
+    "lili_pink": LiliPinkScraper,
 }
 
 

@@ -1,38 +1,20 @@
 import { useEffect, useState } from "react";
 
-
 function imageSrc(imagePath) {
   if (!imagePath) return null;
   // Normalize backslashes first -- see Products.jsx's imageSrc for why
   // (rows scraped on Windows before a since-fixed backend bug store
-  // "storage\products\..." instead of "storage/products/..."). The
-  // previous split("storage/") approach here silently broke on those
-  // rows since it only ever matched the forward-slash form.
+  // "storage\products\..." instead of "storage/products/...").
   const normalized = imagePath.replace(/\\/g, "/");
   const idx = normalized.indexOf("storage/");
   return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
 }
 
-
-const EMPTY = {
-  product_name: "",
-  our_product_code: "",
-  category: "sweaters",
-  description: "",
-  colorways: "",
-  fabric: "",
-  size_range: "",
-  target_price: "",
-  moq: "",
-  lead_time: "",
-  packaging: "",
-  notes: "",
-};
-
 export default function OurProducts() {
   const [products, setProducts] = useState([]);
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [result, setResult] = useState(null);
 
   function refresh() {
     fetch("/api/catalogue/products")
@@ -42,35 +24,35 @@ export default function OurProducts() {
 
   useEffect(refresh, []);
 
-  async function submit(e) {
-    e.preventDefault();
-    setSaving(true);
+  async function generate() {
+    setGenerating(true);
+    setResult(null);
     try {
-      const payload = {
-        ...form,
-        target_price: form.target_price ? parseFloat(form.target_price) : null,
-        moq: form.moq ? parseInt(form.moq, 10) : null,
-      };
-      await fetch("/api/catalogue/products", {
+      const res = await fetch("/api/catalogue/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({}), // clear_after defaults to true on the backend
       });
-      setForm(EMPTY);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "PPT generation failed");
+      setResult({ ok: true, filename: data.filename });
+    } catch (err) {
+      setResult({ ok: false, error: String(err.message || err) });
     } finally {
-      setSaving(false);
+      setGenerating(false);
       refresh();
     }
   }
 
-  async function uploadImage(productId, file) {
-    const body = new FormData();
-    body.append("file", file);
-    await fetch(`/api/catalogue/products/${productId}/image?kind=OUR_PRODUCT`, {
-      method: "POST",
-      body,
-    });
-    refresh();
+  async function clearAll() {
+    if (!confirm("Remove every product from this batch? This does not delete a generated PPT, just this selection.")) return;
+    setClearing(true);
+    try {
+      await fetch("/api/catalogue/cart", { method: "DELETE" });
+    } finally {
+      setClearing(false);
+      refresh();
+    }
   }
 
   async function toggleApprove(product) {
@@ -87,70 +69,40 @@ export default function OurProducts() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-6">Add Our Product</h1>
+      <h1 className="text-2xl font-semibold mb-2">Our Products</h1>
+      <p className="text-sm text-neutral-500 mb-6">
+        This is the current PPT batch — products you selected from Products, Search Products, or
+        Explore Categories. Generating a PPT automatically clears this list so you can start
+        selecting the next batch right away.
+      </p>
 
-      <form onSubmit={submit} className="bg-white border border-neutral-200 rounded-lg p-5 mb-8 grid grid-cols-3 gap-3">
-        {[
-          ["product_name", "Product Name", true],
-          ["our_product_code", "Product Code"],
-          ["colorways", "Colorways (comma separated)"],
-          ["fabric", "Fabric"],
-          ["size_range", "Size Range (e.g. XS-XL)"],
-          ["target_price", "Target Price"],
-          ["moq", "MOQ"],
-          ["lead_time", "Lead Time"],
-          ["packaging", "Packaging"],
-        ].map(([key, label, required]) => (
-          <div key={key}>
-            <label className="text-xs text-neutral-500 block mb-1">{label}</label>
-            <input
-              value={form[key]}
-              onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-              required={!!required}
-              className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
-            />
-          </div>
-        ))}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={generate}
+          disabled={generating || products.length === 0}
+          className="px-4 py-2 bg-neutral-900 text-white rounded-md text-sm disabled:opacity-50"
+        >
+          {generating ? "Generating…" : `Generate PPT (${products.length})`}
+        </button>
+        <button
+          onClick={clearAll}
+          disabled={clearing || products.length === 0}
+          className="px-4 py-2 border border-neutral-300 rounded-md text-sm disabled:opacity-50"
+        >
+          {clearing ? "Clearing…" : "Clear All"}
+        </button>
+      </div>
 
-        <div>
-          <label className="text-xs text-neutral-500 block mb-1">Category</label>
-          <select
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
-          >
-            <option value="sweaters">Sweaters</option>
-            <option value="blouses">Blouses</option>
-          </select>
+      {result?.ok && (
+        <div className="mb-6 text-sm text-green-700 bg-green-50 rounded-md p-3">
+          ✓ Generated {result.filename}. This batch has been cleared — pick your next set of products
+          whenever you're ready.
         </div>
+      )}
+      {result?.ok === false && (
+        <div className="mb-6 text-sm text-red-700 bg-red-50 rounded-md p-3">✗ {result.error}</div>
+      )}
 
-        <div className="col-span-3">
-          <label className="text-xs text-neutral-500 block mb-1">Description</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
-            rows={2}
-          />
-        </div>
-        <div className="col-span-3">
-          <label className="text-xs text-neutral-500 block mb-1">Notes</label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
-            rows={2}
-          />
-        </div>
-
-        <div className="col-span-3">
-          <button disabled={saving} className="px-4 py-2 bg-neutral-900 text-white rounded-md text-sm disabled:opacity-50">
-            {saving ? "Saving…" : "Add Product"}
-          </button>
-        </div>
-      </form>
-
-      <h2 className="text-lg font-semibold mb-4">Our Products</h2>
       <div className="grid grid-cols-3 gap-4">
         {products.map((p) => (
           <div key={p.id} className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
@@ -158,7 +110,7 @@ export default function OurProducts() {
               {p.image_path ? (
                 <img src={imageSrc(p.image_path)} alt={p.product_name} className="object-cover w-full h-full" />
               ) : (
-                <span className="text-neutral-400 text-xs">No image — upload below</span>
+                <span className="text-neutral-400 text-xs">No image</span>
               )}
               <span className="absolute top-2 left-2 text-[10px] bg-black/70 text-white px-2 py-0.5 rounded-full">
                 {p.image_kind || "OUR_PRODUCT"}
@@ -166,15 +118,12 @@ export default function OurProducts() {
             </div>
             <div className="p-3">
               <div className="text-sm font-medium truncate">{p.product_name}</div>
-              <div className="text-xs text-neutral-500">{p.our_product_code}</div>
-              {p.target_price && <div className="text-sm mt-1">${p.target_price}</div>}
-
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files[0] && uploadImage(p.id, e.target.files[0])}
-                className="text-xs mt-2 w-full"
-              />
+              <div className="text-xs text-neutral-500">{p.category}</div>
+              {p.target_price && (
+                <div className="text-sm mt-1">
+                  {p.currency || "USD"} {p.target_price}
+                </div>
+              )}
 
               <div className="flex gap-2 mt-3">
                 <button
@@ -183,16 +132,21 @@ export default function OurProducts() {
                     p.approved ? "bg-green-600 text-white" : "bg-neutral-200 text-neutral-700"
                   }`}
                 >
-                  {p.approved ? "Approved ✓" : "Approve for Catalogue"}
+                  {p.approved ? "In Deck ✓" : "Excluded — click to include"}
                 </button>
                 <button onClick={() => remove(p.id)} className="px-2 py-1.5 text-xs rounded-md border border-neutral-300">
-                  Delete
+                  Remove
                 </button>
               </div>
             </div>
           </div>
         ))}
-        {products.length === 0 && <div className="text-sm text-neutral-500">No products added yet.</div>}
+        {products.length === 0 && (
+          <div className="text-sm text-neutral-500">
+            Nothing selected yet — go to Products, Search Products, or Explore Categories and check
+            "Add to PPT" on anything you want in the next deck.
+          </div>
+        )}
       </div>
     </div>
   );

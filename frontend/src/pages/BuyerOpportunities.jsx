@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 
-const CATEGORIES = ["sweaters", "blouses"];
-
 function imageSrc(p) {
   if (p.local_image_path) {
-    // Normalize backslashes first -- see Products.jsx's imageSrc for
-    // why (some rows have Windows-style "storage\products\..." paths
-    // from before a since-fixed backend bug).
     const normalized = p.local_image_path.replace(/\\/g, "/");
     const idx = normalized.indexOf("storage/");
     return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
@@ -14,8 +9,13 @@ function imageSrc(p) {
   return p.image_url || null;
 }
 
-export default function Opportunities() {
-  const [category, setCategory] = useState("sweaters");
+export default function BuyerOpportunities() {
+  const [categories, setCategories] = useState([]);
+  const [category, setCategory] = useState("");
+  const [sources, setSources] = useState([]); // every source available for the chosen category
+  const [buyer, setBuyer] = useState("");
+  const [competitors, setCompetitors] = useState([]); // selected subset of sources (excluding buyer)
+
   const [opportunities, setOpportunities] = useState([]);
   const [gapTable, setGapTable] = useState([]);
   const [generating, setGenerating] = useState(false);
@@ -24,16 +24,78 @@ export default function Opportunities() {
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
+  // Categories: whatever's actually been scraped, not a fixed list.
+  useEffect(() => {
+    fetch("/api/products/meta/categories")
+      .then((r) => r.json())
+      .then((cats) => {
+        setCategories(cats);
+        if (cats.length && !category) setCategory(cats[0]);
+      });
+  }, []);
+
+  // Sources available for the chosen category -- this list grows on its
+  // own as new brands get scraped for this category, no code change
+  // needed. Picking a category resets the buyer/competitor selection
+  // since last category's choices may not exist in the new one.
+  useEffect(() => {
+    if (!category) return;
+    fetch(`/api/products/meta/sources?category=${encodeURIComponent(category)}`)
+      .then((r) => r.json())
+      .then((list) => {
+        setSources(list);
+        setBuyer((prev) => (list.includes(prev) ? prev : list[0] || ""));
+        setCompetitors([]);
+      });
+  }, [category]);
+
+  const competitorChoices = sources.filter((s) => s !== buyer);
+
+  function toggleCompetitor(source) {
+    setCompetitors((prev) =>
+      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
+    );
+  }
+
+  useEffect(() => {
+    // Same race-condition guard as Analytics.jsx -- picking a buyer then
+    // quickly toggling a competitor fires two overlapping fetches; without
+    // this, an out-of-order response can silently overwrite the correct,
+    // newer one a moment after you made the selection.
+    if (!category || !buyer) return;
+    let cancelled = false;
+
+    fetch(`/api/opportunities?category=${encodeURIComponent(category)}`)
+      .then((r) => r.json())
+      .then((result) => {
+        if (!cancelled) setOpportunities(result);
+      });
+
+    const gapParams = new URLSearchParams({ category, our_source: buyer });
+    if (competitors.length) gapParams.set("competitor_sources", competitors.join(","));
+    fetch(`/api/analytics/gap?${gapParams.toString()}`)
+      .then((r) => r.json())
+      .then((result) => {
+        if (!cancelled) setGapTable(result);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [category, buyer, competitors]);
+
   function refresh() {
-    fetch(`/api/opportunities?category=${category}`)
+    if (!category || !buyer) return;
+    fetch(`/api/opportunities?category=${encodeURIComponent(category)}`)
       .then((r) => r.json())
       .then(setOpportunities);
-    fetch(`/api/analytics/gap?category=${category}`)
+
+    const gapParams = new URLSearchParams({ category, our_source: buyer });
+    if (competitors.length) gapParams.set("competitor_sources", competitors.join(","));
+    fetch(`/api/analytics/gap?${gapParams.toString()}`)
       .then((r) => r.json())
       .then(setGapTable);
   }
-
-  useEffect(refresh, [category]);
 
   async function generate() {
     setGenerating(true);
@@ -41,12 +103,26 @@ export default function Opportunities() {
       await fetch("/api/opportunities/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, top_n: 15 }),
+        body: JSON.stringify({
+          category,
+          top_n: 15,
+          our_source: buyer,
+          // Empty selection = "everyone else" (matches the original
+          // Suburbia-vs-market behavior); a specific selection = exactly
+          // those competitors.
+          competitor_sources: competitors.length ? competitors : null,
+        }),
       });
     } finally {
       setGenerating(false);
       refresh();
     }
+  }
+
+  function downloadExcel() {
+    const params = new URLSearchParams({ category, our_source: buyer });
+    if (competitors.length) params.set("competitor_sources", competitors.join(","));
+    window.location.href = `/api/opportunities/export?${params.toString()}`;
   }
 
   async function setStatus(id, status) {
@@ -85,35 +161,94 @@ export default function Opportunities() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-6">Suburbia Opportunities</h1>
+      <h1 className="text-2xl font-semibold mb-2">Buyer Opportunities</h1>
+      <p className="text-sm text-neutral-500 mb-6">
+        Pick a buyer and which competitors to compare it against — any brand that's been scraped for
+        this category is available, no fixed list.
+      </p>
 
-      <div className="flex gap-3 mb-6 items-center">
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c[0].toUpperCase() + c.slice(1)}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={generate}
-          disabled={generating}
-          className="px-4 py-2 bg-neutral-900 text-white rounded-md text-sm disabled:opacity-50"
-        >
-          {generating ? "Generating…" : "Generate / Refresh Opportunities"}
-        </button>
+      <div className="bg-white border border-neutral-200 rounded-lg p-4 mb-6 space-y-4">
+        <div className="flex gap-3 items-end flex-wrap">
+          <div>
+            <label className="block text-xs text-neutral-500 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-neutral-500 mb-1">Buyer</label>
+            <select
+              value={buyer}
+              onChange={(e) => setBuyer(e.target.value)}
+              className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+            >
+              {sources.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={generate}
+            disabled={generating || !buyer}
+            className="px-4 py-2 bg-neutral-900 text-white rounded-md text-sm disabled:opacity-50"
+          >
+            {generating ? "Generating…" : "Generate / Refresh Opportunities"}
+          </button>
+          <button
+            onClick={downloadExcel}
+            disabled={!buyer}
+            className="px-4 py-2 border border-neutral-300 rounded-md text-sm disabled:opacity-50"
+          >
+            Download Excel
+          </button>
+        </div>
+
+        <div>
+          <label className="block text-xs text-neutral-500 mb-2">
+            Competitors ({competitors.length === 0 ? "all others" : `${competitors.length} selected`})
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {competitorChoices.map((s) => (
+              <label
+                key={s}
+                className={`text-xs px-2.5 py-1.5 rounded-full border cursor-pointer ${
+                  competitors.includes(s)
+                    ? "bg-neutral-900 text-white border-neutral-900"
+                    : "bg-white text-neutral-600 border-neutral-300"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={competitors.includes(s)}
+                  onChange={() => toggleCompetitor(s)}
+                  className="hidden"
+                />
+                {s}
+              </label>
+            ))}
+            {competitorChoices.length === 0 && (
+              <span className="text-xs text-neutral-400">No other brands scraped for this category yet.</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-3">
           {opportunities.length === 0 && (
             <div className="text-sm text-neutral-500">
-              No opportunities yet — run scrapers + AI attribute extraction for this category, then click
-              "Generate / Refresh Opportunities".
+              No opportunities yet — run scrapers + AI attribute extraction for both sides of this
+              comparison, then click "Generate / Refresh Opportunities".
             </div>
           )}
           {opportunities.map((o, idx) => (
@@ -158,7 +293,7 @@ export default function Opportunities() {
                       <div className="font-medium">{o.competitor_score}</div>
                     </div>
                     <div>
-                      <div className="text-neutral-400">Suburbia Gap</div>
+                      <div className="text-neutral-400">Gap</div>
                       <div className="font-medium">{o.suburbia_gap_score}</div>
                     </div>
                     <div>
@@ -248,13 +383,15 @@ export default function Opportunities() {
 
         <div>
           <div className="bg-white border border-neutral-200 rounded-lg p-4">
-            <div className="text-sm font-medium mb-3">Gap Table (Suburbia vs Market)</div>
+            <div className="text-sm font-medium mb-3">
+              Gap Table ({buyer || "—"} vs {competitors.length ? competitors.join(", ") : "market"})
+            </div>
             <table className="w-full text-xs">
               <thead className="text-neutral-500">
                 <tr>
                   <th className="text-left pb-2">Concept</th>
                   <th className="text-right pb-2">Market</th>
-                  <th className="text-right pb-2">Suburbia</th>
+                  <th className="text-right pb-2">Ours</th>
                   <th className="text-right pb-2">Gap</th>
                 </tr>
               </thead>

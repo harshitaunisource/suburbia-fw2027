@@ -1,0 +1,1199 @@
+[
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/blusas/cat_SB_3001",
+    "currency": "MXN",
+    "notes": "Mexico / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/playeras/cat_SB_3002",
+    "currency": "MXN",
+    "notes": "Mexico / Women -- Playeras"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops (alt)",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/tops/catst54189086",
+    "currency": "MXN",
+    "notes": "Mexico / Women -- Separate 'Tops' category distinct from Playeras"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/pantalones/cat_SB_3005",
+    "currency": "MXN",
+    "notes": "Mexico / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/su%C3%A9teres/cat_SB_3008",
+    "currency": "MXN",
+    "notes": "Mexico / Women -- Su\u00e9teres"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/blusas/cat_SB_3001",
+    "currency": "MXN",
+    "notes": "Mexico / Women -- No distinct 'camisas' for women; Blusas is equivalent"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/pantalones/cat_SB_3005",
+    "currency": "MXN",
+    "notes": "Mexico / Women -- Also see Shorts y Bermudas cat_SB_3004"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/playeras/cat_SB_3026",
+    "currency": "MXN",
+    "notes": "Mexico / Men -- Playeras"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/pantalones/cat_SB_3251",
+    "currency": "MXN",
+    "notes": "Mexico / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/su%C3%A9teres/cat_SB_3024",
+    "currency": "MXN",
+    "notes": "Mexico / Men -- Su\u00e9teres"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/camisas/cat_SB_3025",
+    "currency": "MXN",
+    "notes": "Mexico / Men -- Camisas"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Suburbia",
+    "category_url": "https://www.suburbia.com.mx/tienda/pantalones/cat_SB_3251",
+    "currency": "MXN",
+    "notes": "Mexico / Men -- Also see Shorts y Bermudas cat_SB_3028"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/woman-shirts-blouses-l1221.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/woman-tops-l1322.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/woman-trousers-l1335.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/woman-knitwear-sweaters-l1165.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/woman-shirts-shirts-l1244.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/woman-trousers-l1335.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/man-shirts-l737.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Men -- No distinct men's 'tops' category; closest is shirts"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/man-trousers-l838.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/man-knitwear-sweaters-l701.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/man-shirts-l737.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Zara",
+    "category_url": "https://www.zara.com/uk/en/man-trousers-l838.html",
+    "currency": "GBP",
+    "notes": "UK/Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/ladies/shop-by-product/shirts-and-blouses/blouses.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/ladies/shop-by-product/tops.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/ladies/shop-by-product/trousers.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/ladies/shop-by-product/cardigans-and-jumpers.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/ladies/shop-by-product/shirts-and-blouses.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/ladies/shop-by-product/trousers.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/men/shop-by-product/t-shirts-and-tanks.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/men/shop-by-product/trousers.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/men/shop-by-product/knitwear.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/men/shop-by-product/shirts.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "H&M",
+    "category_url": "https://www2.hm.com/en_gb/men/shop-by-product/trousers.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/women/tops/shirts-blouses/cat/?cid=11318",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/women/tops/cat/?cid=4169",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/women/trousers-leggings/cat/?cid=2640",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/women/jumpers-cardigans/cat/?cid=2637",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/women/tops/shirts-blouses/cat/?cid=11318",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/women/trousers-leggings/cat/?cid=2640",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/men/t-shirts-tank-tops/cat/?cid=7616",
+    "currency": "GBP",
+    "notes": "UK / Men -- No distinct men's 'tops'; closest is t-shirts"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/men/trousers-chinos/cat/?cid=4910",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/men/jumpers-cardigans/cat/?cid=7617",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/men/shirts/cat/?cid=3602",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "ASOS",
+    "category_url": "https://www.asos.com/men/trousers-chinos/cat/?cid=4910",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Women-Blouses-c-1733.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Women-Tops-c-2223.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Women-Pants-c-1740.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Women-Sweaters-c-1734.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Women-Blouses-c-1733.html",
+    "currency": "GBP",
+    "notes": "UK / Women -- Shirts and blouses combined in same category"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Women-Pants-c-1740.html",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Shein",
+    "category_url": "https://m.shein.co.uk/Men-Tops-c-1970.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Men-Bottoms-c-2045.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Shein",
+    "category_url": "https://m.shein.co.uk/Men-Knitwear-c-1977.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Men-Shirts-c-1979.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Shein",
+    "category_url": "https://www.shein.co.uk/Men-Bottoms-c-2045.html",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/shopping/women-tops-blouses",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-us/women-clothing/tops",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/women-clothing/trousers",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/women-clothing/knitwear",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/shopping/women-tops-blouses",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/women-clothing/trousers",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/men-clothing/t-shirts",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/men-clothing/trousers",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/men-clothing/knitwear",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/men-clothing/shirts",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Harrods",
+    "category_url": "https://www.harrods.com/en-gb/men-clothing/trousers",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/women-clothing-blouses",
+    "currency": "EUR",
+    "notes": "Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/women-clothing-shirts-tops",
+    "currency": "EUR",
+    "notes": "Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/women-clothing-trousers",
+    "currency": "EUR",
+    "notes": "Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/women-clothing-jumpers-cardigans",
+    "currency": "EUR",
+    "notes": "Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/women-clothing-shirts-tops",
+    "currency": "EUR",
+    "notes": "Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/women-clothing-trousers",
+    "currency": "EUR",
+    "notes": "Europe / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/men-clothing-shirts-tops",
+    "currency": "EUR",
+    "notes": "Europe / Men -- May redirect to shirts/t-shirts hub; verify"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/men-clothing-trousers",
+    "currency": "EUR",
+    "notes": "Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/men-clothing-jumpers-cardigans",
+    "currency": "EUR",
+    "notes": "Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/men-clothing-shirts",
+    "currency": "EUR",
+    "notes": "Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "C&A",
+    "category_url": "https://www.c-and-a.com/eu/en/shop/men-clothing-trousers",
+    "currency": "EUR",
+    "notes": "Europe / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/women/clothing/shirts-and-blouses/blouses",
+    "currency": "GBP",
+    "notes": "UK (London) / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/women/clothing/tops-and-t-shirts",
+    "currency": "GBP",
+    "notes": "UK (London) / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/women/clothing/trousers-and-leggings",
+    "currency": "GBP",
+    "notes": "UK (London) / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/women/clothing/jumpers-and-cardigans",
+    "currency": "GBP",
+    "notes": "UK (London) / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/women/clothing/shirts-and-blouses",
+    "currency": "GBP",
+    "notes": "UK (London) / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/women/clothing/trousers-and-leggings",
+    "currency": "GBP",
+    "notes": "UK (London) / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/men/clothing/tops-and-t-shirts",
+    "currency": "GBP",
+    "notes": "UK (London) / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/men/clothing/trousers",
+    "currency": "GBP",
+    "notes": "UK (London) / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/men/clothing/jumpers-and-cardigans",
+    "currency": "GBP",
+    "notes": "UK (London) / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/men/clothing/shirts",
+    "currency": "GBP",
+    "notes": "UK (London) / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Primark",
+    "category_url": "https://www.primark.com/en-gb/c/men/clothing/trousers",
+    "currency": "GBP",
+    "notes": "UK (London) / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/womens-tops-shirts-and-blouses",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/womens-tops",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/womens-trousers",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/womens-knitwear-jumpers",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/womens-tops-shirts-and-blouses",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/womens-bottoms",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/mens-tops",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/mens-trousers",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/mens-knitwear",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/mens-shirts",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Boohoo",
+    "category_url": "https://www.boohoo.com/categories/mens-trousers",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/women/shirts-and-blouses?cid=72087",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/women/all-tops?cid=72091",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/women/pants?cid=5475",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/women/sweaters-and-cardigans?cid=20408",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/women/shirts-and-blouses?cid=72087",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/women/pants?cid=5475",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/men/tops?cid=1126985",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/men/pants?cid=5211",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/men/sweaters?cid=63315",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/category.do?cid=1010005",
+    "currency": "USD",
+    "notes": "USA / Men -- Casual & button-up shirts"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Old Navy",
+    "category_url": "https://oldnavy.gap.com/browse/men/pants?cid=5211",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/shirts-blouses-women-s-clothing/-/N-m7sh2",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/tops-women-s-clothing/target-brands/-/N-5xtbqZxmf9o",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/pants-women-s-clothing/-/N-5xtc6",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/sweaters-women-s-clothing/-/N-5xtbx",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/shirts-blouses-women-s-clothing/-/N-m7sh2",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/bottoms-women-s-clothing/target-brands/-/N-txhdtZxmf9o",
+    "currency": "USD",
+    "notes": "USA / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/shirts-men-s-clothing/-/N-5xu28",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/pants-men-s-clothing/-/N-5xu29",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/sweaters-men-s-clothing/-/N-5xu1z",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/shirts-men-s-clothing/-/N-5xu28",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Target",
+    "category_url": "https://www.target.com/c/pants-men-s-clothing/-/N-5xu29",
+    "currency": "USD",
+    "notes": "USA / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-women-productaffiliation-tops/category-blouses",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/womens/clothing",
+    "currency": "GBP",
+    "notes": "UK / Women -- General tops/clothing hub"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-women-category-trousers-0",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-women-category-jumpers",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-women-productaffiliation-tops/category-shirts-use-casual",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-women-category-trousers-0",
+    "currency": "GBP",
+    "notes": "UK / Women"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-men-category-shirts-0",
+    "currency": "GBP",
+    "notes": "UK / Men -- No distinct 'tops'; closest is shirts"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-men-category-trousers-0",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-men-productaffiliation-knitwear/category-jumpers",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-men-category-shirts-0",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "brand": "Next",
+    "category_url": "https://www.next.co.uk/shop/gender-men-category-trousers-0",
+    "currency": "GBP",
+    "notes": "UK / Men"
+  }
+]

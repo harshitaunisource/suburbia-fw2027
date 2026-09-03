@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import CatalogueProduct, ImageKind, Product, ProductOpportunity, OpportunityStatus
+from app.services.pricing import compute_mrp
 from app.schemas import (
+    CartToggleRequest,
     CatalogueProductFromProductRequest,
     CatalogueProductIn,
     CatalogueProductOut,
@@ -34,6 +36,78 @@ def list_catalogue_products(approved: bool | None = None, db: Session = Depends(
     if approved is not None:
         q = q.filter(CatalogueProduct.approved.is_(approved))
     return q.order_by(CatalogueProduct.sort_order, CatalogueProduct.id).all()
+
+
+# ------------------------------------------------------------------ cart
+# "Cart" is not a separate table -- it's simply every CatalogueProduct
+# row that has a source_ref. Storing it as real rows (instead of, say,
+# frontend-only state) means the selection survives navigating between
+# pages AND a full page refresh, without any extra plumbing: the
+# Products / Search Products / Explore Categories pages just ask
+# GET /cart/refs once on load to know which checkboxes should start
+# checked.
+@router.get("/cart/refs")
+def list_cart_refs(db: Session = Depends(get_db)):
+    """Every source_ref currently in the cart -- e.g.
+    ["product:12", "generic_product:44"]. Used to restore checkbox state
+    when a product-listing page loads."""
+    rows = (
+        db.query(CatalogueProduct.source_ref)
+        .filter(CatalogueProduct.source_ref.isnot(None))
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.post("/cart/toggle", response_model=CatalogueProductOut | dict)
+def toggle_cart_item(body: CartToggleRequest, db: Session = Depends(get_db)):
+    """Checking a product's 'Add to PPT' box calls this; unchecking it
+    calls this again with the same source_ref. Whichever state it's NOT
+    currently in is the one it moves to."""
+    existing = (
+        db.query(CatalogueProduct)
+        .filter(CatalogueProduct.source_ref == body.source_ref)
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"in_cart": False, "source_ref": body.source_ref}
+
+    product = CatalogueProduct(
+        product_name=body.product_name,
+        category=body.category,
+        description=body.description,
+        image_path=body.image_path,
+        image_kind=ImageKind.COMPETITOR if body.image_path else ImageKind.OUR_PRODUCT,
+        colorways=body.colorways,
+        fabric=body.fabric,
+        size_range=body.size_range,
+        target_price=body.target_price,
+        currency=body.currency or "USD",
+        notes=body.notes,
+        source_ref=body.source_ref,
+        approved=True,
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return product
+
+
+@router.delete("/cart")
+def clear_cart(db: Session = Depends(get_db)):
+    """Manual 'Clear Cart' button -- removes every current cart item
+    (source_ref IS NOT NULL) without waiting for a PPT to be generated.
+    Does not touch any older, non-cart catalogue rows (source_ref IS
+    NULL) that may still exist from before this feature."""
+    deleted = (
+        db.query(CatalogueProduct)
+        .filter(CatalogueProduct.source_ref.isnot(None))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"deleted": deleted}
 
 
 @router.post("/products", response_model=CatalogueProductOut)
@@ -132,6 +206,12 @@ def create_catalogue_product_from_competitor(
     if not source_product:
         raise HTTPException(status_code=404, detail="Source product not found")
 
+    # MRP-only rule (2026-08-31): use the shared compute_mrp() helper
+    # (app/services/pricing.py) -- the single sanctioned way to derive a
+    # usable price anywhere in this project, never a discounted/sale
+    # price.
+    mrp = compute_mrp(source_product.price, source_product.original_price)
+
     catalogue_product = CatalogueProduct(
         opportunity_id=opportunity.id,
         product_name=source_product.product_name,
@@ -143,7 +223,15 @@ def create_catalogue_product_from_competitor(
         colorways=source_product.colors,
         fabric=source_product.material,
         size_range=source_product.sizes,
-        target_price=source_product.price,
+        target_price=mrp,
+        # Fixes a real, confirmed-live bug: this field did not exist on
+        # CatalogueProduct at all before, so a competitor's price in any
+        # non-USD currency (confirmed on Zara, priced in INR) got its
+        # currency information silently dropped here, and the generated
+        # PPT then displayed it with a hardcoded "$" regardless of the
+        # real currency. Always carry the source product's actual
+        # currency through explicitly.
+        currency=source_product.currency or "USD",
         notes=(
             f"Reference product from {source_product.source}"
             + (f" ({source_product.brand})" if source_product.brand else "")
@@ -169,7 +257,19 @@ def generate_catalogue(req: GenerateCatalogueRequest, db: Session = Depends(get_
         season_title=req.season_title,
         market_direction=req.market_direction,
     )
-    return {"path": path, "filename": os.path.basename(path)}
+    cleared = 0
+    if req.clear_after:
+        # The batch that just went into this deck is done with -- clear
+        # it so the merchant can start selecting a fresh set of products
+        # for the next PPT immediately, instead of having to delete each
+        # entry from the last batch by hand first.
+        cleared = (
+            db.query(CatalogueProduct)
+            .filter(CatalogueProduct.source_ref.isnot(None))
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+    return {"path": path, "filename": os.path.basename(path), "cleared": cleared}
 
 
 @router.get("/download/{filename}")

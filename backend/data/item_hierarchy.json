@@ -1,0 +1,44 @@
+[
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Blouses",
+    "sanity_keywords": "blouse, blouses, blusa, shirt"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Bottoms",
+    "sanity_keywords": "pant, pants, trouser, trousers, jean, jeans, bottom, bottoms"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Pants/Trousers",
+    "sanity_keywords": "pant, pants, trouser, trousers, jean, jeans, chino, chinos"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Shirts",
+    "sanity_keywords": "shirt, shirts, camisa"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Sweaters",
+    "sanity_keywords": "sweater, sweaters, jumper, cardigan, knit, knitwear, pullover"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops",
+    "sanity_keywords": "top, tops, tee, t-shirt, tank, camisole"
+  },
+  {
+    "item_type": "GARMENT",
+    "category": "APPAREL",
+    "sub_category": "Tops (alt)",
+    "sanity_keywords": "top, tops, tee, t-shirt, tank, camisole"
+  }
+]

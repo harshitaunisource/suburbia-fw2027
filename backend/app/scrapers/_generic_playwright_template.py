@@ -36,9 +36,29 @@ from app.scrapers.base import ScrapedProduct
 from app.scrapers.playwright_base import ScraperError
 
 
+def strip_model_details(text: Optional[str]) -> Optional[str]:
+    """Removes model-measurement sentences (e.g. "Model height: 177 cm")
+    from scraped description text. Explicit project requirement: only
+    composition/pattern/color/material/price/name matter for this
+    project -- model details are noise that shouldn't appear anywhere,
+    including in the buyer-facing PPT. Applied defensively here (in
+    addition to ideally not capturing this at scrape time) so already-
+    stored descriptions from before this fix still render cleanly
+    without needing a re-scrape."""
+    if not text:
+        return text
+    # Matches "Model height: 177 cm", "Model is 5'9\" tall", etc. --
+    # deliberately conservative (only strips sentences literally
+    # mentioning "model" + a measurement) rather than a broad filter
+    # that could accidentally remove legitimate garment-fit sentences.
+    cleaned = re.sub(r"Model (?:height|is)[^.]*\.?", "", text, flags=re.IGNORECASE)
+    return cleaned.strip() or None
+
+
 def meta_content(soup: BeautifulSoup, prop: str) -> Optional[str]:
     el = soup.select_one(f"meta[property='{prop}']") or soup.select_one(f"meta[name='{prop}']")
     return el["content"].strip() if el and el.get("content") else None
+
 
 # Substrings that indicate og:image resolved to a generic placeholder
 # instead of a real product photo -- confirmed live on Primark, where
@@ -104,7 +124,22 @@ CATEGORY_SANITY_KEYWORDS = {
         "blouse", "shirt", "top", "tunic", "tank", "camisole",
         "blusa", "camisa", "playera", "top", "tunica", "túnica",
     ],
+    "pajamas": [
+        "pajama", "pajamas", "pyjama", "pyjamas", "sleepwear", "nightwear",
+        "pijama", "pijamas", "piyama", "piyamas", "camison", "camisón",
+    ],
 }
+
+
+def keywords_match(text: str, keywords: list[str]) -> bool:
+    """Low-level word-boundary keyword check, shared by matches_category
+    (Suburbia's hardcoded sweaters/blouses lists) and the generic
+    category explorer (arbitrary, user-editable keyword lists per
+    sub-category). Word-boundary, not plain substring: `kw in text`
+    would match "men" inside "Women's Summer Dress", which is exactly
+    the kind of false positive this exists to prevent."""
+    lowered = text.lower()
+    return any(re.search(rf"\b{re.escape(kw.strip().lower())}\b", lowered) for kw in keywords if kw.strip())
 
 
 def matches_category(name: str, description: Optional[str], category: Optional[str]) -> bool:
@@ -117,8 +152,31 @@ def matches_category(name: str, description: Optional[str], category: Optional[s
     keywords = CATEGORY_SANITY_KEYWORDS.get(category or "")
     if not keywords:
         return True
-    text = f"{name} {description or ''}".lower()
-    return any(kw in text for kw in keywords)
+    text = f"{name} {description or ''}"
+    return keywords_match(text, keywords)
+
+
+# Matches common composition/material strings like "80% Cotton 20%
+# Polyester" or "Composition: 100% Viscose" -- best-effort, since
+# there's no universal way to extract this from an arbitrary site's page
+# text without site-specific structure. Works reasonably well because
+# nearly every fashion retailer states composition in this same
+# percentage-plus-fiber-name format regardless of site.
+COMPOSITION_RE = re.compile(
+    r"((?:\d{1,3}%\s*[A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1]+[\s,]*){1,4})", re.IGNORECASE
+)
+
+
+def extract_composition(text: str) -> Optional[str]:
+    """Best-effort composition/material extraction -- see COMPOSITION_RE.
+    Returns the first plausible match (e.g. "80% Cotton 20% Polyester"),
+    or None if nothing matches (composition is one of this project's
+    mandatory fields -- callers should treat a None here as reason to
+    flag/skip a product, not silently proceed without it)."""
+    match = COMPOSITION_RE.search(text)
+    if match:
+        return match.group(1).strip().rstrip(",")
+    return None
 
 
 def parse_generic_product(
@@ -165,6 +223,8 @@ def parse_generic_product(
     price, original_price = current_and_original(prices)
     disc_pct = discount_percentage(price, original_price)
 
+    composition = extract_composition(text)
+
     if category_hint and not matches_category(name, description, category_hint):
         raise ScraperError(
             f"'{name}' doesn't contain any {category_hint}-related keyword in its name or "
@@ -189,7 +249,7 @@ def parse_generic_product(
         discount_price=price if original_price else None,
         discount_percentage=disc_pct,
         description=description,
-        material=None,
+        material=composition,
         sizes=[],
         colors=[],
         availability="in_stock",

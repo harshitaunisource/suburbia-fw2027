@@ -35,6 +35,9 @@ const SCRAPER_CATEGORIES = [
 
   { source: "asos", label: "ASOS — Jumpers & Cardigans", category: "sweaters", url: "https://www.asos.com/us/women/jumpers-cardigans/cat/?cid=2637", verified: true },
   { source: "asos", label: "ASOS — Shirts & Blouses", category: "blouses", url: "https://www.asos.com/us/women/shirts-blouses/cat/?cid=15200", verified: true },
+
+  { source: "textilon", label: "Textilon — Women's Pajamas", category: "pajamas", url: "https://bo.textilon.com/articulos/categoria/mujer/subcategoria/pijamas", verified: true },
+  { source: "textilon", label: "Textilon — Men's Pajamas", category: "pajamas", url: "https://bo.textilon.com/articulos/categoria/hombre/subcategoria/pijamas", verified: true },
 ];
 
 export default function DataCollection() {
@@ -51,7 +54,11 @@ export default function DataCollection() {
   useEffect(refresh, []);
 
   async function runScraper(source, category, url) {
-    const key = `${source}-${category}`;
+    // Must match the 3-part key format used in the table below
+    // (source-category-url) -- otherwise this would never equal the
+    // `running === key` check on the button, and the loading state
+    // would silently never show.
+    const key = `${source}-${category}-${url}`;
     setRunning(key);
     setLastResult(null);
     try {
@@ -103,7 +110,21 @@ export default function DataCollection() {
         </thead>
         <tbody>
           {SCRAPER_CATEGORIES.map((c) => {
-            const key = `${c.source}-${c.category}`;
+            // Keyed on url too, not just source+category: Textilon has
+            // two rows (women's/men's) that share the same category
+            // ("pajamas"), which would otherwise produce a duplicate
+            // React key and make both rows' "Run Scraper" buttons show
+            // as loading together when either one was clicked.
+            const key = `${c.source}-${c.category}-${c.url}`;
+            // NOTE: the status/last-run/product-count columns below are
+            // looked up by source+category only (matching the backend's
+            // /api/scrapers/status grouping) -- for Textilon specifically,
+            // this means the women's and men's rows will show the SAME
+            // aggregate status, since both share category="pajamas" and
+            // the backend doesn't currently track per-URL run history
+            // within one category. Not a display bug for any other
+            // source (each has a unique category), just a known
+            // limitation for this one case.
             const statusRow = rows.find((r) => r.source === c.source && r.category === c.category);
             return (
               <tr key={key} className="border-t border-neutral-200">

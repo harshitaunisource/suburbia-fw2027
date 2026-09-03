@@ -33,6 +33,35 @@ def list_products(
     return q.order_by(Product.scraped_at.desc()).offset(offset).limit(limit).all()
 
 
+@router.get("/meta/categories")
+def list_categories(db: Session = Depends(get_db)):
+    """Every category that has at least one scraped product -- powers
+    the category dropdown on Buyer Opportunities / Market Analytics so
+    it reflects what's actually been scraped instead of a hardcoded
+    list that goes stale the moment a new category is added."""
+    rows = (
+        db.query(Product.category)
+        .filter(Product.category.isnot(None))
+        .distinct()
+        .order_by(Product.category)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.get("/meta/sources")
+def list_sources(category: str | None = None, db: Session = Depends(get_db)):
+    """Every distinct source ('suburbia', 'zara', 'women_secret', ...)
+    that has scraped products, optionally narrowed to one category.
+    Powers the buyer/competitor and brand multi-select dropdowns --
+    these lists grow automatically as new brands get scraped, no code
+    change needed."""
+    q = db.query(Product.source).filter(Product.source.isnot(None)).distinct()
+    if category:
+        q = q.filter(Product.category == category)
+    return sorted(r[0] for r in q.all())
+
+
 @router.get("/{product_id}", response_model=ProductOut)
 def get_product(product_id: int, db: Session = Depends(get_db)):
     return db.query(Product).get(product_id)

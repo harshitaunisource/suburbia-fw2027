@@ -64,6 +64,18 @@ CATEGORY_URLS = {
         "sweaters": "https://www.asos.com/us/women/jumpers-cardigans/cat/?cid=2637",
         "blouses": "https://www.asos.com/us/women/shirts-blouses/cat/?cid=15200",
     },
+    "textilon": {
+        "pajamas": "https://bo.textilon.com/articulos/categoria/mujer/subcategoria/pijamas",
+    },
+    "lupo": {
+        "pajamas": "https://www.lupo.com.br/feminino/pijamas",
+    },
+    "women_secret": {
+        "pajamas": "https://womensecret.com/es/es/mujer/dormir-y-homewear/pijamas",
+    },
+    "lili_pink": {
+        "pajamas": "https://www.lilipink.com/mujer/pijamas",
+    },
 }
 
 

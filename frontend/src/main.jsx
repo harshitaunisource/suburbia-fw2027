@@ -5,19 +5,27 @@ import "./index.css";
 import Dashboard from "./pages/Dashboard";
 import DataCollection from "./pages/DataCollection";
 import Products from "./pages/Products";
+import SearchProducts from "./pages/SearchProducts";
 import Analytics from "./pages/Analytics";
-import Opportunities from "./pages/Opportunities";
+import BuyerOpportunities from "./pages/BuyerOpportunities";
 import OurProducts from "./pages/OurProducts";
 import Catalogue from "./pages/Catalogue";
+import ExploreCategories from "./pages/ExploreCategories";
+import BrandSetup from "./pages/BrandSetup";
+import AddBrand from "./pages/AddBrand";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
+  { to: "/brand-setup", label: "Brand Setup" },
+  { to: "/add-brand", label: "Add Brand" },
   { to: "/data-collection", label: "Data Collection" },
   { to: "/products", label: "Products" },
+  { to: "/search-products", label: "Search Products" },
   { to: "/analytics", label: "Market Analytics" },
-  { to: "/opportunities", label: "Suburbia Opportunities" },
+  { to: "/opportunities", label: "Buyer Opportunities" },
   { to: "/our-products", label: "Our Products" },
   { to: "/catalogue", label: "Generate Catalogue" },
+  { to: "/explore-categories", label: "Explore Categories" },
 ];
 
 function Shell() {
@@ -48,12 +56,16 @@ function Shell() {
         <main className="flex-1 p-8">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/brand-setup" element={<BrandSetup />} />
+            <Route path="/add-brand" element={<AddBrand />} />
             <Route path="/data-collection" element={<DataCollection />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/search-products" element={<SearchProducts />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/opportunities" element={<Opportunities />} />
+            <Route path="/opportunities" element={<BuyerOpportunities />} />
             <Route path="/our-products" element={<OurProducts />} />
             <Route path="/catalogue" element={<Catalogue />} />
+            <Route path="/explore-categories" element={<ExploreCategories />} />
           </Routes>
         </main>
       </div>
