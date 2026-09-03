@@ -1,22 +1,25 @@
-FROM python:3.12-slim
+# Using Playwright's own official image instead of plain python:3.12-slim.
+# Why: python:3.12-slim now resolves to Debian 13 ("trixie"), which is
+# newer than Playwright 1.47.0 (pinned in requirements.txt) knows about.
+# `playwright install --with-deps` doesn't recognize trixie and silently
+# falls back to guessing Ubuntu 20.04's package list -- which references
+# font packages (ttf-unifont, ttf-ubuntu-font-family) that don't exist in
+# trixie's actual repos, so the build fails with "no installation
+# candidate". Playwright's own image sidesteps this entirely: it's built
+# and tested specifically for this exact Playwright version, with
+# Chromium and every OS-level dependency already correctly installed.
+FROM mcr.microsoft.com/playwright/python:v1.47.0-jammy
 
 WORKDIR /app
-
-# System dependencies Playwright's Chromium needs to actually run
-# headless (not just be installed) -- Railway's default builder doesn't
-# include these, so without this step scrapes would fail in production
-# even though everything works locally.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget gnupg ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Downloads the actual Chromium binary + its remaining OS-level deps in
-# one step -- this is the production equivalent of the
-# `python -m playwright install chromium` you ran locally.
-RUN python -m playwright install --with-deps chromium
+# Chromium's binary is already present in this base image (that's the
+# whole point of using it) -- this just confirms it / fills in anything
+# version-specific for this exact Python environment. No --with-deps
+# needed here since the OS-level dependencies are already baked in.
+RUN python -m playwright install chromium
 
 COPY . .
 
