@@ -15,16 +15,33 @@ from app.services.ai.base import ATTRIBUTE_FIELDS
 from app.services.ai.factory import get_ai_provider
 
 
-def run_attribute_extraction(db: Session, limit: int = 500, category: str | None = None) -> dict:
+def run_attribute_extraction(
+    db: Session, limit: int = 500, category: str | None = None, force: bool = False
+) -> dict:
+    """
+    force=False (default): only processes products with NO attributes
+    row yet -- the normal, cheap incremental behavior.
+
+    force=True: reprocesses EVERY matching product, even ones that
+    already have attributes -- existing rows are updated in place
+    (never duplicated; product_id is unique on ProductAttributes) rather
+    than skipped. Needed whenever you change AI_PROVIDER (e.g. mock ->
+    openai/anthropic) and want previously-processed products to actually
+    pick up the new provider's results -- without this, switching
+    providers silently does nothing for anything already processed,
+    since by definition those products no longer look "unprocessed".
+    """
     provider = get_ai_provider()
 
-    def _unprocessed_query():
-        q = db.query(Product).outerjoin(ProductAttributes).filter(ProductAttributes.id.is_(None))
+    def _query():
+        q = db.query(Product)
+        if not force:
+            q = q.outerjoin(ProductAttributes).filter(ProductAttributes.id.is_(None))
         if category:
             q = q.filter(Product.category == category)
         return q
 
-    products = _unprocessed_query().limit(limit).all()
+    products = _query().limit(limit).all()
 
     processed = 0
     failed = 0
@@ -37,27 +54,38 @@ def run_attribute_extraction(db: Session, limit: int = 500, category: str | None
                 category=product.category or "unknown",
                 image_path=product.local_image_path,
             )
-            attrs = ProductAttributes(product_id=product.id)
+            attrs = (
+                db.query(ProductAttributes)
+                .filter(ProductAttributes.product_id == product.id)
+                .first()
+            )
+            if not attrs:
+                attrs = ProductAttributes(product_id=product.id)
+                db.add(attrs)
             for field in ATTRIBUTE_FIELDS:
                 setattr(attrs, field, result.get(field, "unknown"))
             attrs.ai_confidence = result.get("confidence", 0.0)
-            db.add(attrs)
             processed += 1
         except Exception:
             failed += 1
             continue
 
     db.commit()
+
+    def _unprocessed_query():
+        q = db.query(Product).outerjoin(ProductAttributes).filter(ProductAttributes.id.is_(None))
+        if category:
+            q = q.filter(Product.category == category)
+        return q
+
     return {
         "provider": provider.name,
         "category": category or "all",
+        "force": force,
         "processed": processed,
         "failed": failed,
-        # BUG FIX: this previously counted unprocessed products across
-        # ALL categories regardless of the `category` filter passed in,
-        # which made "remaining_unprocessed: 243" print immediately after
-        # finishing all 225 sweaters -- that 243 was actually the blouse
-        # count waiting in the next loop iteration, not a real problem
-        # with sweaters. Now correctly scoped to match what was just run.
+        # Scoped to match what was just run, not the whole database --
+        # see the BUG FIX note this replaced for why that distinction
+        # matters.
         "remaining_unprocessed_in_this_category": _unprocessed_query().count(),
     }

@@ -91,6 +91,12 @@ def main():
              "Use this while going source-by-source; run once more at the end "
              "with --skip-scrape to process everything you've collected.",
     )
+    parser.add_argument(
+        "--force-attributes", action="store_true",
+        help="Reprocess products that already have attributes, not just new ones. "
+             "Needed after changing AI_PROVIDER -- otherwise already-processed "
+             "products silently keep their old provider's (e.g. mock's) results.",
+    )
     args = parser.parse_args()
 
     if args.skip_scrape and args.scrape_only:
@@ -147,7 +153,9 @@ def main():
     print("=" * 70)
     if not args.scrape_only:
         for category in categories:
-            result = run_attribute_extraction(db, limit=5000, category=category)
+            result = run_attribute_extraction(
+                db, limit=5000, category=category, force=args.force_attributes
+            )
             print(f"  {category}: {result}")
     else:
         print("  (skipped -- --scrape-only was set)")

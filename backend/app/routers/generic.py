@@ -486,7 +486,12 @@ def list_products(
 
 # ------------------------------------------------------------------ analytics
 @router.get("/analytics")
-def get_analytics(sub_category_id: int, buyer_id: Optional[int] = None, db: Session = Depends(get_db)):
+def get_analytics(
+    sub_category_id: int,
+    brand: Optional[str] = None,
+    buyer_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
     """Deliberately simple: price distribution and per-brand counts only.
     No gap analysis, no AI attribute extraction, no opportunity scoring --
     there is no Suburbia-equivalent baseline to compare against for an
@@ -499,6 +504,8 @@ def get_analytics(sub_category_id: int, buyer_id: Optional[int] = None, db: Sess
     average), uses MRP via compute_mrp() (never a discounted price), and
     does not include "median" (removed per explicit request)."""
     q = db.query(GenericProduct).filter(GenericProduct.sub_category_id == sub_category_id)
+    if brand:
+        q = q.filter(GenericProduct.brand == brand)
     if buyer_id is not None:
         q = q.filter(GenericProduct.buyer_id == buyer_id)
     products = q.all()

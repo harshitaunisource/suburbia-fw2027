@@ -16,6 +16,7 @@ export default function ExploreCategories() {
   const [itemType, setItemType] = useState("");
   const [category, setCategory] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
+  const [brand, setBrand] = useState(""); // "" = all brands
   const [sources, setSources] = useState([]);
   const [products, setProducts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -45,17 +46,20 @@ export default function ExploreCategories() {
   const itemTypes = Object.keys(tree).sort();
   const categories = itemType ? Object.keys(tree[itemType] || {}).sort() : [];
   const subCategories = itemType && category ? tree[itemType][category] || [] : [];
+  const availableBrands = [...new Set(sources.map((s) => s.brand))].sort();
 
-  function refreshResults(id) {
+  function refreshResults(id, brandFilter) {
     if (!id) return;
     fetch(`/api/generic/sources?sub_category_id=${id}`).then((r) => r.json()).then(setSources);
-    fetch(`/api/generic/products?sub_category_id=${id}`).then((r) => r.json()).then(setProducts);
-    fetch(`/api/generic/analytics?sub_category_id=${id}`).then((r) => r.json()).then(setAnalytics);
+    const params = new URLSearchParams({ sub_category_id: id });
+    if (brandFilter) params.set("brand", brandFilter);
+    fetch(`/api/generic/products?${params.toString()}`).then((r) => r.json()).then(setProducts);
+    fetch(`/api/generic/analytics?${params.toString()}`).then((r) => r.json()).then(setAnalytics);
   }
 
   useEffect(() => {
-    if (subCategoryId) refreshResults(subCategoryId);
-  }, [subCategoryId]);
+    if (subCategoryId) refreshResults(subCategoryId, brand);
+  }, [subCategoryId, brand]);
 
   async function runSource(sourceId) {
     setRunning(sourceId);
@@ -72,7 +76,7 @@ export default function ExploreCategories() {
     } finally {
       setElapsedMs(Date.now() - startedAt);
       setRunning(null);
-      refreshResults(subCategoryId);
+      refreshResults(subCategoryId, brand);
     }
   }
 
@@ -123,7 +127,10 @@ export default function ExploreCategories() {
 
         <select
           value={subCategoryId}
-          onChange={(e) => setSubCategoryId(e.target.value)}
+          onChange={(e) => {
+            setSubCategoryId(e.target.value);
+            setBrand("");
+          }}
           disabled={!category}
           className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white disabled:opacity-50"
         >
@@ -131,6 +138,20 @@ export default function ExploreCategories() {
           {subCategories.map((s) => (
             <option key={s.id} value={s.id}>
               {s.sub_category}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+          disabled={!subCategoryId}
+          className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white disabled:opacity-50"
+        >
+          <option value="">All Brands</option>
+          {availableBrands.map((b) => (
+            <option key={b} value={b}>
+              {b}
             </option>
           ))}
         </select>

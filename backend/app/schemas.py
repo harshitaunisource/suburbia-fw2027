@@ -72,10 +72,13 @@ class DashboardStats(BaseModel):
     shortlisted_styles: int
     catalogue_styles: int
 
-
 class RunAttributeExtractionRequest(BaseModel):
     category: Optional[str] = None
     limit: int = 500
+    # See run_attribute_extraction()'s docstring: without this, switching
+    # AI_PROVIDER and re-running silently does nothing for any product
+    # that was already processed by the old provider.
+    force: bool = False
 
 
 class OpportunityOut(BaseModel):
