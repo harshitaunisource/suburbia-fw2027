@@ -3,19 +3,20 @@ import CartBar from "../components/CartBar";
 import { cartItemFromProduct, useCart } from "../lib/cart";
 
 function imageSrc(p) {
+  // Prefer the ORIGINAL remote image_url over the locally-downloaded
+  // copy -- a local file only exists on whichever machine/container ran
+  // the scrape, which on a stateless deployment with a shared external
+  // database is almost never the one serving this request. See
+  // SearchProducts.jsx's imageSrc for the full explanation. The
+  // Windows-backslash normalization below is kept as the fallback path
+  // for older rows that have no image_url at all.
+  if (p.image_url) return p.image_url;
   if (p.local_image_path) {
-    // Normalize backslashes first: some rows (scraped on Windows before
-    // a since-fixed backend bug) have local_image_path stored with
-    // Windows-style "storage\products\..." separators instead of
-    // "storage/products/...". Without this, the "storage/" search below
-    // would silently miss those rows and try to load a broken URL
-    // containing literal backslashes -- normalizing here means already
-    //-scraped data displays correctly without needing to re-scrape.
     const normalized = p.local_image_path.replace(/\\/g, "/");
     const idx = normalized.indexOf("storage/");
     return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
   }
-  return p.image_url || null;
+  return null;
 }
 
 export default function Products() {

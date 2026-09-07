@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 
 function imageSrc(p) {
+  // Prefer the ORIGINAL remote image_url over the locally-downloaded
+  // copy -- a local file only exists on whichever machine/container ran
+  // the scrape, which on a stateless deployment with a shared external
+  // database is almost never the one serving this request. See
+  // SearchProducts.jsx's imageSrc for the full explanation.
+  if (p.image_url) return p.image_url;
   if (p.local_image_path) {
     const normalized = p.local_image_path.replace(/\\/g, "/");
     const idx = normalized.indexOf("storage/");
     return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
   }
-  return p.image_url || null;
+  return null;
 }
 
 export default function BuyerOpportunities() {
