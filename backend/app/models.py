@@ -356,3 +356,10 @@ class GenericScrapeRun(Base):
     # at a glance whether a brand needed structural clustering or fell
     # all the way back to a regex, without digging through logs.
     link_discovery_strategy = Column(String(30))
+    # Live progress fields, added 2026-09-07 -- updated DURING the scrape
+    # (not just once at the end) so the frontend's polling loop can show
+    # real step-by-step status ("Found 24 candidates, checking 5/24...")
+    # instead of one static "please wait" message with no indication of
+    # whether anything is actually happening.
+    candidates_total = Column(Integer)   # set once link discovery finishes
+    current_step = Column(String(160))   # short human-readable status

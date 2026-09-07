@@ -239,6 +239,9 @@ def execute_scrape(
     scraper.source_name = f"generic-{source_config.brand}"
     try:
         try:
+            run.current_step = f"Loading {source_config.brand}'s category page..."
+            db.commit()
+
             debug_path = f"generic_{source_config.brand}_{hierarchy.sub_category}_debug.html".replace(" ", "_")
             html = scraper.get_rendered_html(
                 source_config.category_url,
@@ -256,6 +259,9 @@ def execute_scrape(
                 wait_selector_hidden=category_wait_hidden_for(source_config.category_url),
             )
 
+            run.current_step = "Category page loaded -- looking for product links..."
+            db.commit()
+
             product_urls, strategy = discover_product_links(
                 html,
                 base_url=source_config.category_url,
@@ -263,6 +269,11 @@ def execute_scrape(
                 max_links=max_products,
             )
             run.link_discovery_strategy = strategy
+            run.candidates_total = len(product_urls)
+            run.current_step = (
+                f"Found {len(product_urls)} candidate product(s) -- checking each one now..."
+                if product_urls else "No candidate product links found."
+            )
             db.commit()
             print(
                 f"[generic:{source_config.brand}] found {len(product_urls)} candidate links "
@@ -297,6 +308,9 @@ def execute_scrape(
                           f"to pick up where this left off (already-saved products are skipped "
                           f"automatically).", flush=True)
                     break
+                run.current_step = f"Checking product {i} of {len(product_urls)} -- {found} saved so far..."
+                run.products_found = found
+                db.commit()
                 try:
                     product_html = scraper.get_rendered_html(
                         purl,
@@ -396,6 +410,7 @@ def execute_scrape(
             run.products_new = new_count
             run.images_downloaded = images_ok
             run.images_failed = images_failed
+            run.current_step = f"Done -- {found} product(s) saved."
             if stopped_early:
                 run.error_message = (
                     f"Stopped after {MAX_SCRAPE_SECONDS}s safety-valve budget -- saved {found} "
@@ -419,6 +434,7 @@ def execute_scrape(
             db.rollback()
             run.status = "failed"
             run.error_message = str(e)
+            run.current_step = "Failed."
             run.finished_at = datetime.utcnow()
             db.commit()
             return run
@@ -426,6 +442,7 @@ def execute_scrape(
             db.rollback()
             run.status = "failed"
             run.error_message = f"Unexpected error: {e}"
+            run.current_step = "Failed."
             run.finished_at = datetime.utcnow()
             db.commit()
             return run
