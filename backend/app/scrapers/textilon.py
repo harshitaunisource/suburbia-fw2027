@@ -34,6 +34,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 from urllib.parse import urljoin
+from bs4 import BeautifulSoup
 
 from app.scrapers._generic_playwright_template import parse_generic_product
 from app.scrapers.base import ScrapedProduct
@@ -143,7 +144,10 @@ class TextilonScraper(PlaywrightScraper):
         products: list[ScrapedProduct] = []
         for i, purl in enumerate(product_urls, start=1):
             try:
-                product_html = self.get_rendered_html(purl, wait_selector="h1", wait_ms=8000)
+                debug_product_path = f"textilon_product_debug.html" if i == 1 else None
+                product_html = self.get_rendered_html(
+                    purl, wait_selector="div.producto_", wait_ms=8000, debug_save_path=debug_product_path
+                )
                 parsed = parse_generic_product(
                     product_html, purl, self.source_name, brand="Textilon",
                     category_hint=category_hint, currency=CURRENCY,
@@ -172,6 +176,47 @@ class TextilonScraper(PlaywrightScraper):
                         f"https://textilon-store.nyc3.digitaloceanspaces.com/bo/"
                         f"{gender_folder}/pijamas_500x600/{code_match.group(1)}.jpg"
                     )
+                                    # CONFIRMED live bug, same root cause and same fix
+                # pattern as the og:image override above: Textilon's
+                # <head> og:title / og:description are set ONCE,
+                # statically, in the Vue SPA's server-rendered shell,
+                # and never get updated per-route -- every single
+                # product page reports the exact same site-wide
+                # "Textilón - Tienda online" / generic tagline, which
+                # parse_generic_product() takes at face value since it
+                # only falls back to <h1> when og:title is MISSING, not
+                # when it's present-but-wrong. Confirmed live: every
+                # scraped Textilon product ended up with an identical
+                # name and description, which then fed identical
+                # (useless) text into AI attribute extraction for all
+                # of them. The real per-product name IS correctly
+                # present in the visible <h1> (that's exactly why this
+                # scraper already waits for wait_selector="h1" above) --
+                # just never actually used for it. Override both here
+                # using the same product_html already fetched, rather
+                # than changing parse_generic_product's fallback order
+                # for every other site that relies on its current
+                # (correct, for them) og:title-first behavior.
+                detail_soup = BeautifulSoup(product_html, "html.parser")
+                title_div = detail_soup.select_one("div.producto_.text-3xl")
+                real_name = title_div.get_text(strip=True) if title_div else None
+                if real_name:
+                    parsed.product_name = real_name
+                else:
+                    print(
+                        f"[textilon] ({i}/{total}) WARNING: title div not found on {purl} -- "
+                        f"keeping the (likely generic/wrong) og:title-derived name.",
+                        flush=True,
+                    )
+                # No reliable per-product description source has been
+                # confirmed on this site (og:description is the same
+                # static, wrong text as og:title was) -- leaving this
+                # None is strictly better than feeding a confidently
+                # wrong generic description into keyword matching or AI
+                # extraction. product_name alone (now the real <h1>,
+                # e.g. "PIJAMA CAMISON CON ENCAJE - JAGUARES") already
+                # carries real style/pattern signal.
+                parsed.description = None
                 products.append(parsed)
                 print(f"[textilon] ({i}/{total}) OK: {parsed.product_name}", flush=True)
             except ScraperError as e:
@@ -191,11 +236,19 @@ class TextilonScraper(PlaywrightScraper):
         return products
 
     def scrape_product(self, url: str, category_hint: Optional[str] = None) -> ScrapedProduct:
-        html = self.get_rendered_html(url, wait_selector="h1", wait_ms=8000)
-        return parse_generic_product(
+        html = self.get_rendered_html(url, wait_selector="div.producto_", wait_ms=8000)
+        parsed = parse_generic_product(
             html, url, self.source_name, brand="Textilon", category_hint=category_hint or "pajamas",
             currency=CURRENCY, title_separators=("|",),
         )
+        # Same override as scrape_category() above -- see that method's
+        # comment for the confirmed real cause.
+        soup = BeautifulSoup(html, "html.parser")
+        title_div = soup.select_one("div.producto_.text-3xl")
+        if title_div:
+            parsed.product_name = title_div.get_text(strip=True)
+        parsed.description = None
+        return parsed
 
 
 if __name__ == "__main__":

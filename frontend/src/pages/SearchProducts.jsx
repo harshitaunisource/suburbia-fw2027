@@ -21,12 +21,15 @@ export default function SearchProducts() {
 
   const [brand, setBrand] = useState("");
   const [url, setUrl] = useState("");
-  const [existingSource, setExistingSource] = useState(null); // a matching source for this brand+category, if any
+  const [gender, setGender] = useState(""); // "" | "WOMENS" | "MENS" | "UNISEX" | "KIDS"
+  const [existingSource, setExistingSource] = useState(null); // a matching source for this brand+category+gender, if any
   // Defaults to reusing the existing source when one is found, but this
-  // can be overridden -- e.g. "Textilon" already has a women's pajamas
-  // URL registered, but someone searching Textilon's MEN'S pajamas needs
-  // a different URL entirely. Without this override, the form would
-  // silently reuse the wrong (women's) URL with no way to change it.
+  // can still be overridden manually. Before the `gender` field existed,
+  // this match was on (brand, sub_category) ALONE -- so "Textilon" +
+  // Pajamas always matched the same single source no matter which
+  // gender was actually being searched, meaning a men's search would
+  // silently reuse (and scrape into) the already-registered women's
+  // source. Matching on gender too is the actual fix for that.
   const [useExisting, setUseExisting] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [pdpPattern, setPdpPattern] = useState("");
@@ -36,6 +39,14 @@ export default function SearchProducts() {
   const [products, setProducts] = useState([]);
   const [lastRun, setLastRun] = useState(null);
   const [elapsedMs, setElapsedMs] = useState(null);
+
+  // "Browse the real site yourself, paste one link" path -- for sites
+  // whose category page won't reliably render its product grid for an
+  // automated browser (confirmed live on Textilon: the grid stays
+  // empty even after a long wait). Scrapes exactly the one pasted URL.
+  const [singleUrl, setSingleUrl] = useState("");
+  const [addingSingle, setAddingSingle] = useState(false);
+  const [singleError, setSingleError] = useState(null);
   const cart = useCart();
 
   useEffect(() => {
@@ -46,8 +57,11 @@ export default function SearchProducts() {
   const categories = itemType ? Object.keys(tree[itemType] || {}).sort() : [];
   const subCategories = itemType && category ? tree[itemType][category] || [] : [];
 
-  // Whenever brand + sub-category are both chosen, check whether this
-  // exact brand name has already been searched for this category.
+  // Whenever brand + sub-category + gender are all chosen, check
+  // whether this exact combination has already been searched. Matching
+  // on gender too (not just brand + sub-category) is what lets a
+  // brand's Men's and Women's lines in the same category be tracked as
+  // two distinct sources instead of one merging into the other.
   useEffect(() => {
     setExistingSource(null);
     setUseExisting(true);
@@ -56,10 +70,14 @@ export default function SearchProducts() {
     fetch(`/api/generic/sources?${params.toString()}`)
       .then((r) => r.json())
       .then((sources) => {
-        const match = sources.find((s) => s.brand.toLowerCase() === brand.trim().toLowerCase());
+        const match = sources.find(
+          (s) =>
+            s.brand.toLowerCase() === brand.trim().toLowerCase() &&
+            (s.gender || "") === (gender || "")
+        );
         if (match) setExistingSource(match);
       });
-  }, [brand, subCategoryId]);
+  }, [brand, subCategoryId, gender]);
 
   const needsUrl = !existingSource || !useExisting;
 
@@ -82,6 +100,7 @@ export default function SearchProducts() {
         const body = {
           brand,
           category_url: url,
+          gender: gender || null,
           // No buyer/role -- Search Products is deliberately standalone.
           // Brand Setup's "add competitor/buyer" flow can attach this
           // exact source to a real buyer later without duplicating it.
@@ -114,9 +133,22 @@ export default function SearchProducts() {
       const run = await scrapeRes.json();
       setLastRun(run);
       setElapsedMs(Date.now() - startedAt);
-      if (!scrapeRes.ok) throw new Error(run.detail || "Scrape failed.");
+      // Backend always returns HTTP 200 for /scrape, even when the run
+      // itself failed (status: "failed" with a real error_message) --
+      // that's intentional (a failed run is still a valid, complete API
+      // response, not a server error). Checking scrapeRes.ok ALONE was
+      // the actual bug behind every "nothing happens, no error shown"
+      // report: a genuinely failed run (e.g. "no product links found")
+      // was silently treated as success, the code moved on to fetch
+      // /products, got back [], and since lastRun.status was "failed"
+      // (not "success"), NEITHER the green nor the amber box matched --
+      // nothing rendered at all, with no visible error anywhere.
+      if (!scrapeRes.ok || run.status === "failed") {
+        throw new Error(run.error_message || run.detail || "Scrape failed.");
+      }
 
       const prodParams = new URLSearchParams({ sub_category_id: source.sub_category_id, brand: source.brand });
+      if (source.gender) prodParams.set("gender", source.gender);
       const prodRes = await fetch(`/api/generic/products?${prodParams.toString()}`);
       setProducts(await prodRes.json());
     } catch (err) {
@@ -124,6 +156,31 @@ export default function SearchProducts() {
       setError(String(err.message || err));
     } finally {
       setSearching(false);
+    }
+  }
+
+  async function handleAddSingleUrl(e) {
+    e.preventDefault();
+    if (!existingSource) {
+      setSingleError("Search (or create) a source above first, so this product has a brand/category/gender to attach to.");
+      return;
+    }
+    setAddingSingle(true);
+    setSingleError(null);
+    try {
+      const res = await fetch("/api/generic/products/add-by-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_config_id: existingSource.id, product_url: singleUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Couldn't add this product.");
+      setProducts((prev) => (prev.some((p) => p.id === data.id) ? prev : [data, ...prev]));
+      setSingleUrl("");
+    } catch (err) {
+      setSingleError(String(err.message || err));
+    } finally {
+      setAddingSingle(false);
     }
   }
 
@@ -159,10 +216,24 @@ export default function SearchProducts() {
             placeholder="e.g. Mango"
             className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Gender / product line</label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+          >
+            <option value="">Not specified</option>
+            <option value="WOMENS">Women's</option>
+            <option value="MENS">Men's</option>
+            <option value="UNISEX">Unisex</option>
+            <option value="KIDS">Kids</option>
+          </select>
           <p className="text-xs text-neutral-400 mt-1">
-            Tip: if a brand has separate men's/women's (or other) listings under the same category,
-            give each one a distinct name here -- e.g. "Textilon" and "Textilon (Men)" -- so each
-            keeps its own URL instead of sharing one.
+            If this brand has separate men's/women's/kids listings in the same category, set this
+            so each is tracked as its own source instead of one overwriting the other.
           </p>
         </div>
 
@@ -339,11 +410,17 @@ export default function SearchProducts() {
           </div>
         )}
         {lastRun && lastRun.status === "success" && lastRun.products_found > 0 && (
-          <div className="text-sm text-green-700">
-            ✓ Found {lastRun.products_found} product{lastRun.products_found === 1 ? "" : "s"}
-            {elapsedMs != null && ` in ${(elapsedMs / 1000).toFixed(1)}s`}.
-          </div>
-        )}
+  <div className="text-sm text-green-700">
+    ✓ Found {lastRun.products_found} product{lastRun.products_found === 1 ? "" : "s"}
+    {elapsedMs != null && ` in ${(elapsedMs / 1000).toFixed(1)}s`}.
+    {products.length > 0 && (
+      <span className="block text-neutral-600 mt-1">
+        {products.slice(0, 8).map((p) => p.product_name).join(", ")}
+        {products.length > 8 ? `, +${products.length - 8} more` : ""}
+      </span>
+    )}
+  </div>
+)}
         {lastRun && lastRun.status === "success" && lastRun.products_found === 0 && (
           <div className="text-sm text-amber-700 bg-amber-50 rounded-md p-3">
             The page loaded fine, but nothing matched as a product
@@ -354,6 +431,40 @@ export default function SearchProducts() {
           </div>
         )}
       </form>
+
+      {existingSource && (
+        <form
+          onSubmit={handleAddSingleUrl}
+          className="bg-white border border-neutral-200 rounded-lg p-4 mb-6 flex items-end gap-3"
+        >
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-2">
+              Add one product by link (for sites where auto-search finds nothing)
+            </label>
+            <input
+              value={singleUrl}
+              onChange={(e) => setSingleUrl(e.target.value)}
+              placeholder="Paste a single product page URL you found by browsing the site yourself"
+              className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
+            />
+            <p className="text-xs text-neutral-400 mt-1">
+              Open "{existingSource.brand}"'s site in a normal browser tab, click into one product,
+              copy its URL, and paste it here -- this scrapes just that page instead of relying on
+              automatic discovery across the whole category.
+            </p>
+          </div>
+          <button
+            type="submit"
+            disabled={!singleUrl.trim() || addingSingle}
+            className="px-4 py-2 bg-neutral-900 text-white rounded-md text-sm disabled:opacity-40 shrink-0"
+          >
+            {addingSingle ? "Adding…" : "Add Product"}
+          </button>
+        </form>
+      )}
+      {singleError && (
+        <div className="text-sm text-red-700 bg-red-50 rounded-md p-3 mb-6">✗ {singleError}</div>
+      )}
 
       {products.length > 0 && (
         <div className="grid grid-cols-4 gap-4">

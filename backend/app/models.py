@@ -8,6 +8,24 @@ Design notes:
   setting DATABASE_URL=postgresql+psycopg2://user:pass@host/db
 - image_kind on `products` implements the mandatory COMPETITOR / OUR_PRODUCT /
   CONCEPT distinction from the spec (section 3 / 18).
+
+2026-09-07 CHANGES (unify Product / GenericProduct + real gender field):
+- `Product` gained buyer_id / role / sub_category_id / source_config_id /
+  pattern / color / gender -- the fields that used to only exist on
+  GenericProduct. Going forward, app/services/generic_scraper.py writes
+  into THIS table, not GenericProduct, so anything scraped from Search
+  Products / Explore Categories / Add Brand shows up on the classic
+  Products page, Market Analytics, and Buyer Opportunities automatically
+  (they've always queried Product; they just never received these rows).
+- `GenericSourceConfig` gained a real `gender` column. This directly
+  fixes the Textilon men's/women's pajama collision: two source configs
+  for the same brand + sub-category can now coexist distinguished by
+  gender instead of colliding on (brand, sub_category_id) alone.
+- GenericProduct / GenericScrapeRun are kept (not dropped) so existing
+  rows and any code still reading them keep working, but they are no
+  longer the write target for new scrapes -- see
+  scripts/migrate_unify_and_add_gender.py for the one-time backfill of
+  already-scraped GenericProduct rows into Product.
 """
 import enum
 from datetime import datetime
@@ -34,18 +52,44 @@ class OpportunityStatus(str, enum.Enum):
     catalogue = "catalogue"
 
 
+class SourceRole(str, enum.Enum):
+    """Every brand tracked in the system is either:
+    - BUYER: the company we're doing this analysis for (e.g. Suburbia,
+      Textilon). Its own product URLs are scraped the same way as any
+      competitor's, just tagged differently so the UI can show "your
+      products" vs. "their products" separately.
+    - COMPETITOR: a brand being tracked *against* one specific buyer.
+      Always has a buyer_id pointing at the buyer it's a competitor of --
+      the same competitor brand (e.g. Zara) could in principle be added
+      again under a different buyer later without conflict, since each
+      row is scoped to one buyer.
+    """
+    BUYER = "BUYER"
+    COMPETITOR = "COMPETITOR"
+
+
+class Gender(str, enum.Enum):
+    """Explicit garment-line field, added 2026-09-07 to fix a real,
+    reproducible collision: Textilon's men's and women's pajamas were
+    both scraped under the same (brand, sub_category) key with no way
+    to tell them apart, so the second source silently overwrote/
+    conflated the first. This lives on GenericSourceConfig (one field
+    per brand+category source, set once when the URL is added) and is
+    copied onto every Product row that source produces -- it is NOT
+    guessed per-product from scraped text, because it describes user
+    intent about which product line was searched, not something to
+    infer from a page.
+    """
+    MENS = "MENS"
+    WOMENS = "WOMENS"
+    UNISEX = "UNISEX"
+    KIDS = "KIDS"
+
+
 class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    # Stable, globally-unique identifier independent of the auto-increment
-    # `id` -- added 2026-08-31 so this project can cross-reference a
-    # specific product across future systems (inventory, buyer-selection
-    # mapping) without depending on database-internal row ids, which
-    # could change if data is ever migrated/re-imported. Generated once
-    # at insert time and never changed. See
-    # scripts/migrate_add_currency_and_uid.py for the one-time backfill
-    # this required on the already-populated production table.
     product_uid = Column(String(36), unique=True, index=True)
     source = Column(String(50), nullable=False, index=True)  # e.g. "suburbia", "zara"
     brand = Column(String(120))
@@ -70,6 +114,16 @@ class Product(Base):
     sizes = Column(Text)      # comma-separated; kept simple for MVP
     colors = Column(Text)     # comma-separated
     availability = Column(String(50))
+
+    # --- Unified 2026-09-07: fields that used to live only on
+    # GenericProduct, now on the one table every consumer page reads.
+    buyer_id = Column(Integer, ForeignKey("buyers.id"), nullable=True, index=True)
+    role = Column(Enum(SourceRole), nullable=True, index=True)
+    sub_category_id = Column(Integer, ForeignKey("item_hierarchy.id"), nullable=True, index=True)
+    source_config_id = Column(Integer, ForeignKey("generic_source_configs.id"), nullable=True)
+    gender = Column(Enum(Gender), nullable=True, index=True)
+    pattern = Column(String(60))
+    color = Column(String(60))
 
     scraped_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -141,14 +195,6 @@ class CatalogueProduct(Base):
     fabric = Column(Text)
     size_range = Column(String(120))
     target_price = Column(Float)
-    # Added 2026-08-31 -- fixes a real bug where a competitor's price in
-    # any non-USD currency (confirmed live: Zara priced in INR) got
-    # displayed with a hardcoded "$" in the generated PPT, since this
-    # column did not previously exist at all and the currency
-    # information was silently dropped when copying a reference product
-    # in via the "Suggest Products" workflow. See
-    # scripts/migrate_add_currency_and_uid.py for the one-time migration
-    # this required on the already-populated production table.
     currency = Column(String(10), default="USD")
     source_ref = Column(String(64), unique=True, index=True, nullable=True)
     moq = Column(Integer)
@@ -182,16 +228,10 @@ class ScrapeRun(Base):
 
 
 # ============================================================================
-# GENERIC CATEGORY EXPLORER (new feature, added 2026-08-28)
-#
-# Deliberately a SEPARATE, standalone set of tables -- not reusing Product /
-# ScrapeRun / ProductOpportunity / CatalogueProduct at all. This is a new,
-# unrelated feature (search-and-scrape any item category, any brand, no
-# comparison baseline) sitting alongside the original Suburbia FW2027
-# gap-analysis feature, which stays completely untouched: none of the
-# existing tables' schemas, data, or code paths are modified by anything
-# below. Keeps the two feature sets impossible to accidentally cross-
-# contaminate.
+# CATEGORY HIERARCHY + BUYER/COMPETITOR SETUP
+# (Buyer, GenericSourceConfig kept as the source-of-truth "what to scrape"
+# config tables. GenericProduct/GenericScrapeRun kept for backward
+# compatibility with pre-migration data -- new scrapes write to Product.)
 # ============================================================================
 
 
@@ -199,46 +239,21 @@ class ItemHierarchy(Base):
     """One row per real (Item Type, Category, Sub Category) combination,
     seeded once from the uploaded Item_Category_SubCategory_Hierarchy.xlsx
     (see scripts/seed_item_hierarchy.py). This is what powers the three
-    cascading dropdowns in the new category-explorer UI."""
+    cascading dropdowns in the category-explorer UI."""
     __tablename__ = "item_hierarchy"
 
     id = Column(Integer, primary_key=True, index=True)
     item_type = Column(String(120), nullable=False, index=True)
     category = Column(String(160), nullable=False, index=True)
     sub_category = Column(String(160), nullable=False, index=True)
-    # Comma-separated keywords used to sanity-check that a scraped product
-    # actually belongs to this sub-category (same defensive pattern already
-    # proven necessary on the Suburbia side -- see
-    # _generic_playwright_template.py's CATEGORY_SANITY_KEYWORDS, which
-    # caught real contamination live on Target). Pre-filled with a
-    # best-guess for common sub-categories; editable via the API since no
-    # keyword list can be complete for 469 possible sub-categories without
-    # real usage data to refine it.
     sanity_keywords = Column(Text)
-
-class SourceRole(str, enum.Enum):
-    """Every brand tracked in the system is either:
-    - BUYER: the company we're doing this analysis for (e.g. Suburbia,
-      Textilon). Its own product URLs are scraped the same way as any
-      competitor's, just tagged differently so the UI can show "your
-      products" vs. "their products" separately.
-    - COMPETITOR: a brand being tracked *against* one specific buyer.
-      Always has a buyer_id pointing at the buyer it's a competitor of --
-      the same competitor brand (e.g. Zara) could in principle be added
-      again under a different buyer later without conflict, since each
-      row is scoped to one buyer.
-    """
-    BUYER = "BUYER"
-    COMPETITOR = "COMPETITOR"
 
 
 class Buyer(Base):
-    """A brand we run this analysis for (added 2026-09-03 so buyers are no
-    longer hardcoded -- 'Suburbia' and 'Textilon' are just the first two
-    rows here, not special-cased anywhere in code). Competitors are
-    tracked per-buyer via GenericSourceConfig.buyer_id, so the same
-    physical brand (e.g. Zara) could be tracked as a competitor under more
-    than one buyer without the data colliding."""
+    """A brand we run this analysis for. Competitors are tracked
+    per-buyer via GenericSourceConfig.buyer_id, so the same physical
+    brand (e.g. Zara) could be tracked as a competitor under more than
+    one buyer without the data colliding."""
     __tablename__ = "buyers"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -246,15 +261,22 @@ class Buyer(Base):
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 class GenericSourceConfig(Base):
-    """A human-curated (brand, category URL, link-discovery pattern) entry
-    for one sub-category. THIS is the piece that cannot be auto-generated:
-    exactly as happened repeatedly on the Suburbia side of this project, a
-    generic 'any href that looks product-shaped' pattern reliably fails
-    against real sites until verified against real HTML. Adding a new
-    brand for a sub-category is expected to follow the same loop already
-    used throughout this project: try a starting pattern, inspect the
-    debug HTML dump on failure, tighten the pattern from real evidence."""
+    """A (brand, category URL, gender, link-discovery override) entry
+    for one sub-category. `pdp_link_pattern` is now an OPTIONAL manual
+    override -- see app/scrapers/link_discovery.py, which tries
+    structural detection (JSON-LD ItemList, then URL-shape clustering)
+    before ever falling back to a regex, so most brands no longer need
+    this field populated at all.
+
+    `gender` (added 2026-09-07): distinguishes multiple source configs
+    for the same brand + sub-category that are genuinely different
+    product lines (e.g. Textilon Men's Pajamas vs. Textilon Women's
+    Pajamas) -- previously the only way to express this was smuggling
+    it into the brand name or notes field, which is exactly what caused
+    the real collision this fixes.
+    """
     __tablename__ = "generic_source_configs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -262,24 +284,30 @@ class GenericSourceConfig(Base):
     buyer_id = Column(Integer, ForeignKey("buyers.id"), nullable=False, index=True)
     role = Column(Enum(SourceRole), default=SourceRole.COMPETITOR, nullable=False, index=True)
     brand = Column(String(120), nullable=False)
+    gender = Column(Enum(Gender), nullable=True, index=True)
     category_url = Column(Text, nullable=False)
-    # Regex (as a plain string) matching product-detail-page hrefs on this
-    # specific site -- same role as each hardcoded PDP_LINK_RE in the
-    # Suburbia scrapers, just made data-driven instead of one Python file
-    # per site. A reasonable generic starting guess is offered by the API
-    # when none is provided, but -- per the above -- expect to need to
-    # tighten it from a real debug HTML dump before it reliably works.
+    # Optional manual override -- see link_discovery.py. A reasonable
+    # generic starting guess is offered by the API when none is
+    # provided, but structural detection is tried first and usually
+    # makes this unnecessary.
     pdp_link_pattern = Column(Text)
+    # Manual fallback ONLY -- the real currency is now detected per-
+    # product from the page itself (see currency_detect.py). This value
+    # is used only when the page gives no usable signal at all.
     currency = Column(String(10), default="USD")
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class GenericProduct(Base):
-    """A scraped product for the generic category explorer. Deliberately
-    NOT the same table as Product (Suburbia's own products table) -- no
-    shared schema, no shared ids, no risk of one feature's data leaking
-    into or being confused with the other's."""
+    """LEGACY table, kept read-only for backward compatibility with
+    data scraped before the 2026-09-07 unification. New scrapes write
+    directly to `Product` (see app/services/generic_scraper.py) so they
+    appear on the classic Products / Market Analytics / Buyer
+    Opportunities pages without a separate code path. Run
+    scripts/migrate_unify_and_add_gender.py once to backfill any
+    pre-existing rows here into `Product`.
+    """
     __tablename__ = "generic_products"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -288,6 +316,7 @@ class GenericProduct(Base):
     source_config_id = Column(Integer, ForeignKey("generic_source_configs.id"), nullable=True)
     buyer_id = Column(Integer, ForeignKey("buyers.id"), nullable=True, index=True)
     role = Column(Enum(SourceRole), nullable=True, index=True)
+    gender = Column(Enum(Gender), nullable=True, index=True)
     brand = Column(String(120))
     product_name = Column(String(255), nullable=False)
     product_code = Column(String(120))
@@ -295,20 +324,9 @@ class GenericProduct(Base):
     image_url = Column(Text)
     local_image_path = Column(Text)
     price = Column(Float)
-    # Populated only when the item is actually on sale -- see
-    # app/services/pricing.py's compute_mrp(), which is the ONLY
-    # sanctioned way to derive a usable price anywhere in this project.
-    # Never read `price` directly for a business purpose; always go
-    # through compute_mrp(price, original_price).
     original_price = Column(Float)
     currency = Column(String(10), default="USD")
-    # Explicit scope per project requirements: composition/material,
-    # pattern, and color are captured where available; anything else
-    # (e.g. model/fit-on-model details) is deliberately NOT scraped or
-    # stored. composition + price + image + name are the mandatory
-    # fields for a product to be usable -- see generic_scraper.py's
-    # validation before a row is saved.
-    material = Column(Text)   # composition, e.g. "80% Cotton 20% Polyester"
+    material = Column(Text)
     pattern = Column(String(60))
     color = Column(String(60))
     description = Column(Text)
@@ -316,9 +334,10 @@ class GenericProduct(Base):
 
 
 class GenericScrapeRun(Base):
-    """Same role as ScrapeRun, but for the generic category explorer --
-    kept separate so the existing Data Collection page's queries/behavior
-    for Suburbia's 10 sources are never affected by this feature."""
+    """Same role as ScrapeRun. Kept for historical runs recorded before
+    the unification; new runs are also recorded here for the Data
+    Collection UI regardless of which table the resulting products land
+    in (see run_generic_scrape in generic_scraper.py)."""
     __tablename__ = "generic_scrape_runs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -332,3 +351,8 @@ class GenericScrapeRun(Base):
     images_failed = Column(Integer, default=0)
     status = Column(String(20), default="running")  # running | success | failed
     error_message = Column(Text)
+    # Which link-discovery strategy actually worked for this run (see
+    # app/scrapers/link_discovery.py) -- purely diagnostic, lets you see
+    # at a glance whether a brand needed structural clustering or fell
+    # all the way back to a regex, without digging through logs.
+    link_discovery_strategy = Column(String(30))

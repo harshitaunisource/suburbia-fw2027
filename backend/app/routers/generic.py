@@ -1,11 +1,13 @@
 """
-Generic category explorer -- endpoints for the standalone "brand setup"
-workflow: add a buyer, add competitors to that buyer, add the category
-(item type / category / sub-category) and the URL to scrape, all as data
-through this API instead of code edits. Completely separate from every
-existing Suburbia FW2027 endpoint: different tables, different services,
-no shared code paths that could let a bug here affect the original
-gap-analysis feature (or vice versa).
+Generic category explorer -- endpoints for the "brand setup" workflow:
+add a buyer, add competitors to that buyer, add the category (item type
+/ category / sub-category / gender) and the URL to scrape.
+
+2026-09-07: `list_products` / `get_analytics` now query the unified
+`Product` table (not `GenericProduct`) -- see models.py's notes. This
+is what makes data scraped through this router show up on the classic
+Products / Market Analytics / Buyer Opportunities pages too, since
+those have always queried `Product`.
 """
 from __future__ import annotations
 
@@ -18,14 +20,16 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Buyer,
-    GenericProduct,
+    Gender,
     GenericScrapeRun,
     GenericSourceConfig,
     ItemHierarchy,
+    Product,
     SourceRole,
 )
-from app.services.generic_scraper import DEFAULT_PDP_LINK_PATTERN, run_generic_scrape
+from app.services.generic_scraper import DEFAULT_PDP_LINK_PATTERN, run_generic_scrape, scrape_single_product_url
 from app.services.pricing import compute_mrp
+from app.scrapers.base import ScraperError
 
 router = APIRouter(prefix="/api/generic", tags=["generic"])
 
@@ -38,10 +42,6 @@ class HierarchyNode(BaseModel):
 
 
 class CreateHierarchyRequest(BaseModel):
-    """Used by the 'Add Brand' form when the item/category/sub-category
-    a person types doesn't already exist in the dropdowns -- lets a
-    non-technical user add a brand-new category on the spot instead of
-    being blocked until someone edits the hierarchy sheet."""
     item_type: str
     category: str
     sub_category: str
@@ -77,14 +77,13 @@ class SourceConfigOut(BaseModel):
     id: int
     buyer_id: Optional[int] = None
     role: Optional[SourceRole] = None
+    gender: Optional[Gender] = None
     sub_category_id: int
     brand: str
     category_url: str
     currency: str
     pdp_link_pattern: Optional[str] = None
     notes: Optional[str] = None
-    # Denormalized for display so the frontend never has to do its own
-    # join just to show "Zara -- GARMENT / APPAREL / Sweaters".
     item_type: Optional[str] = None
     category: Optional[str] = None
     sub_category: Optional[str] = None
@@ -95,21 +94,20 @@ class SourceConfigOut(BaseModel):
 
 
 class CreateSourceRequest(BaseModel):
-    """The single endpoint behind the 'Add Brand' quick-add form: type a
-    brand name + URL, pick (or create) the category, pick (or create) the
-    buyer, say whether this URL is the buyer's own site or a competitor's.
+    """The single endpoint behind the 'Add Brand' quick-add form.
 
-    Category can be given either as an existing sub_category_id, or as
-    (item_type, category, sub_category) text to find-or-create -- so the
-    form works whether or not the exact row already exists.
-
-    Buyer can be given either as an existing buyer_id, or as a new
-    buyer_name to find-or-create -- so adding the very first source for a
-    brand-new buyer doesn't require a separate step first.
+    `gender` (added 2026-09-07): a real field distinguishing multiple
+    source configs for the same brand + sub-category that are genuinely
+    different product lines (e.g. a brand's Men's vs. Women's pajamas).
+    Previously this had no dedicated field at all -- the only way to
+    express it was smuggling it into the brand name or notes, which is
+    exactly what caused a real collision between two Textilon sources
+    sharing one (brand, sub_category) key.
     """
     brand: str
     category_url: str
     role: SourceRole = SourceRole.COMPETITOR
+    gender: Optional[Gender] = None
 
     sub_category_id: Optional[int] = None
     item_type: Optional[str] = None
@@ -119,7 +117,13 @@ class CreateSourceRequest(BaseModel):
     buyer_id: Optional[int] = None
     buyer_name: Optional[str] = None
 
+    # Manual fallback ONLY -- currency is now detected per-product from
+    # the page itself (see app/scrapers/currency_detect.py). This value
+    # is used only when a given product's page gives no usable signal.
     currency: str = "USD"
+    # Optional override -- link discovery tries structural detection
+    # first (see app/scrapers/link_discovery.py) and usually doesn't
+    # need this at all.
     pdp_link_pattern: Optional[str] = None
     notes: Optional[str] = None
 
@@ -128,6 +132,7 @@ class UpdateSourceRequest(BaseModel):
     brand: Optional[str] = None
     category_url: Optional[str] = None
     role: Optional[SourceRole] = None
+    gender: Optional[Gender] = None
     buyer_id: Optional[int] = None
     currency: Optional[str] = None
     pdp_link_pattern: Optional[str] = None
@@ -139,6 +144,7 @@ class ProductOut(BaseModel):
     product_uid: Optional[str] = None
     buyer_id: Optional[int] = None
     role: Optional[SourceRole] = None
+    gender: Optional[Gender] = None
     brand: Optional[str]
     product_name: str
     product_url: str
@@ -157,8 +163,6 @@ class ProductOut(BaseModel):
     @computed_field
     @property
     def mrp(self) -> Optional[float]:
-        """Same rule as the Suburbia-side ProductOut.mrp: the only price
-        figure any consumer should display, never a discounted price."""
         return compute_mrp(self.price, self.original_price)
 
 
@@ -169,6 +173,7 @@ class ScrapeRunOut(BaseModel):
     products_found: int
     products_new: int
     error_message: Optional[str] = None
+    link_discovery_strategy: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -176,6 +181,11 @@ class ScrapeRunOut(BaseModel):
 
 class TriggerScrapeRequest(BaseModel):
     source_config_id: int
+
+
+class AddProductByUrlRequest(BaseModel):
+    source_config_id: int
+    product_url: str
 
 
 def _hierarchy_label(db: Session, sub_category_id: int) -> dict:
@@ -194,6 +204,7 @@ def _source_out(db: Session, source: GenericSourceConfig) -> SourceConfigOut:
         id=source.id,
         buyer_id=source.buyer_id,
         role=source.role,
+        gender=source.gender,
         sub_category_id=source.sub_category_id,
         brand=source.brand,
         category_url=source.category_url,
@@ -208,8 +219,6 @@ def _source_out(db: Session, source: GenericSourceConfig) -> SourceConfigOut:
 # ------------------------------------------------------------------ hierarchy
 @router.get("/hierarchy")
 def get_hierarchy(db: Session = Depends(get_db)):
-    """Returns the full Item Type -> Category -> Sub Category tree for
-    the three cascading dropdowns."""
     rows = db.query(ItemHierarchy).order_by(
         ItemHierarchy.item_type, ItemHierarchy.category, ItemHierarchy.sub_category
     ).all()
@@ -222,12 +231,16 @@ def get_hierarchy(db: Session = Depends(get_db)):
     return tree
 
 
+@router.get("/genders")
+def list_genders():
+    """Powers the Gender dropdown in Add Brand / Search Products --
+    a fixed, small enum rather than free text, so it can't drift or be
+    typo'd the way the old notes-field workaround could."""
+    return [g.value for g in Gender]
+
+
 @router.post("/hierarchy", response_model=HierarchyOut)
 def create_hierarchy(req: CreateHierarchyRequest, db: Session = Depends(get_db)):
-    """Find-or-create: if this exact (item_type, category, sub_category)
-    already exists, returns the existing row instead of making a
-    duplicate -- so a person re-typing an existing category by hand in
-    the 'Add Brand' form doesn't fork the dropdown list."""
     existing = (
         db.query(ItemHierarchy)
         .filter(
@@ -260,9 +273,6 @@ def list_buyers(db: Session = Depends(get_db)):
 
 @router.post("/buyers", response_model=BuyerOut)
 def create_buyer(req: CreateBuyerRequest, db: Session = Depends(get_db)):
-    """Find-or-create by name (case-insensitive) so re-submitting the
-    same buyer name from the quick-add form is a no-op, not a duplicate
-    buyer with the same name."""
     existing = (
         db.query(Buyer).filter(Buyer.name.ilike(req.name.strip())).first()
     )
@@ -277,9 +287,6 @@ def create_buyer(req: CreateBuyerRequest, db: Session = Depends(get_db)):
 
 @router.get("/buyers/{buyer_id}/sources", response_model=list[SourceConfigOut])
 def list_buyer_sources(buyer_id: int, db: Session = Depends(get_db)):
-    """Every source (the buyer's own + all its competitors) across every
-    category -- this is what the 'Brand Setup' master-data page shows per
-    buyer."""
     if not db.get(Buyer, buyer_id):
         raise HTTPException(status_code=404, detail="Buyer not found")
     sources = (
@@ -294,11 +301,6 @@ def list_buyer_sources(buyer_id: int, db: Session = Depends(get_db)):
 # ------------------------------------------------------------------ sources
 @router.get("/sources/unassigned", response_model=list[SourceConfigOut])
 def list_unassigned_sources(db: Session = Depends(get_db)):
-    """Every source with no buyer yet -- brands/URLs pulled in via the
-    standalone Search Products page. Brand Setup's 'add competitor' /
-    'add buyer' form offers these in a dropdown so a brand that's already
-    been searched can be attached to a buyer directly, instead of
-    re-entering its brand name and URL and creating a duplicate row."""
     sources = (
         db.query(GenericSourceConfig)
         .filter(GenericSourceConfig.buyer_id.is_(None))
@@ -312,6 +314,7 @@ def list_unassigned_sources(db: Session = Depends(get_db)):
 def list_sources(
     sub_category_id: Optional[int] = None,
     buyer_id: Optional[int] = None,
+    gender: Optional[Gender] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(GenericSourceConfig)
@@ -319,6 +322,8 @@ def list_sources(
         q = q.filter(GenericSourceConfig.sub_category_id == sub_category_id)
     if buyer_id is not None:
         q = q.filter(GenericSourceConfig.buyer_id == buyer_id)
+    if gender is not None:
+        q = q.filter(GenericSourceConfig.gender == gender)
     if sub_category_id is None and buyer_id is None:
         raise HTTPException(status_code=400, detail="Provide sub_category_id and/or buyer_id")
     return [_source_out(db, s) for s in q.all()]
@@ -326,10 +331,6 @@ def list_sources(
 
 @router.post("/sources", response_model=SourceConfigOut)
 def create_source(req: CreateSourceRequest, db: Session = Depends(get_db)):
-    """The endpoint behind the 'Add Brand' quick-add form. See
-    CreateSourceRequest's docstring for how category/buyer resolution
-    works."""
-    # Resolve (or create) the category.
     sub_category_id = req.sub_category_id
     if sub_category_id is None:
         if not (req.item_type and req.category and req.sub_category):
@@ -357,13 +358,6 @@ def create_source(req: CreateSourceRequest, db: Session = Depends(get_db)):
     elif not db.get(ItemHierarchy, sub_category_id):
         raise HTTPException(status_code=404, detail="sub_category_id not found")
 
-    # Resolve (or create) the buyer -- optional. Leaving both buyer_id
-    # and buyer_name empty is valid and intentional: this is what the
-    # standalone Search Products page does (just pull data for a
-    # brand+category, without deciding yet whether it's a buyer's own
-    # site or a competitor's). Brand Setup's "add competitor/buyer" flow
-    # can attach it to a real buyer later via PATCH instead of creating
-    # a duplicate source.
     buyer_id = req.buyer_id
     role = req.role
     if buyer_id is None and req.buyer_name:
@@ -378,13 +372,31 @@ def create_source(req: CreateSourceRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="buyer_id not found")
 
     if buyer_id is None:
-        # No buyer attached yet -- role is meaningless without one.
         role = None
+
+    # Same-brand-same-category collision guard: if a source already
+    # exists for this exact (brand, sub_category, gender), reuse it
+    # instead of creating a duplicate that would split one brand's
+    # products across two source rows. Without the gender clause here,
+    # this is exactly the check that silently merged Textilon's men's
+    # and women's pajamas before.
+    existing = (
+        db.query(GenericSourceConfig)
+        .filter(
+            GenericSourceConfig.sub_category_id == sub_category_id,
+            GenericSourceConfig.brand.ilike(req.brand.strip()),
+            GenericSourceConfig.gender == req.gender,
+        )
+        .first()
+    )
+    if existing:
+        return _source_out(db, existing)
 
     source = GenericSourceConfig(
         sub_category_id=sub_category_id,
         buyer_id=buyer_id,
         role=role,
+        gender=req.gender,
         brand=req.brand.strip(),
         category_url=req.category_url.strip(),
         currency=req.currency or "USD",
@@ -415,21 +427,18 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    # A source with scrape history can't be deleted outright -- it's
-    # referenced by generic_scrape_runs / generic_products via
-    # source_config_id, and the database (correctly) refuses to delete a
-    # row something else still points at. Rather than let that surface as
-    # a raw 500 (which is what happened with the one-off cleanup script
-    # against this exact situation), check up front and return a clear,
-    # actionable message instead.
     run_count = (
         db.query(GenericScrapeRun)
         .filter(GenericScrapeRun.source_config_id == source_id)
         .count()
     )
+    # Checked against the unified `products` table now (new scrapes
+    # land there) -- legacy generic_products rows for a source deleted
+    # pre-migration are not double-counted since backfill only runs
+    # once and only for URLs not already present.
     product_count = (
-        db.query(GenericProduct)
-        .filter(GenericProduct.source_config_id == source_id)
+        db.query(Product)
+        .filter(Product.source_config_id == source_id)
         .count()
     )
     if run_count or product_count:
@@ -458,6 +467,23 @@ def trigger_scrape(req: TriggerScrapeRequest, db: Session = Depends(get_db)):
     return run
 
 
+@router.post("/products/add-by-url", response_model=ProductOut)
+def add_product_by_url(req: AddProductByUrlRequest, db: Session = Depends(get_db)):
+    """The 'browse the real site yourself, paste one product link'
+    path -- for sites whose category page won't reliably render its
+    product grid for an automated browser (confirmed live on Textilon).
+    Scrapes exactly this one URL and saves it, reusing the same
+    domain-aware parsing the category-driven flow uses."""
+    source = db.get(GenericSourceConfig, req.source_config_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    try:
+        product = scrape_single_product_url(db, source, req.product_url.strip())
+    except ScraperError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return product
+
+
 @router.get("/scrape-runs", response_model=list[ScrapeRunOut])
 def list_scrape_runs(sub_category_id: int, db: Session = Depends(get_db)):
     return (
@@ -474,14 +500,21 @@ def list_products(
     sub_category_id: int,
     brand: Optional[str] = None,
     buyer_id: Optional[int] = None,
+    gender: Optional[Gender] = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(GenericProduct).filter(GenericProduct.sub_category_id == sub_category_id)
+    """Reads from the unified `products` table (2026-09-07) -- anything
+    scraped via Search Products / Explore Categories / Add Brand now
+    lives here, same table the classic Products / Market Analytics /
+    Buyer Opportunities pages already read."""
+    q = db.query(Product).filter(Product.sub_category_id == sub_category_id)
     if brand:
-        q = q.filter(GenericProduct.brand == brand)
+        q = q.filter(Product.brand == brand)
     if buyer_id is not None:
-        q = q.filter(GenericProduct.buyer_id == buyer_id)
-    return q.order_by(GenericProduct.scraped_at.desc()).all()
+        q = q.filter(Product.buyer_id == buyer_id)
+    if gender is not None:
+        q = q.filter(Product.gender == gender)
+    return q.order_by(Product.scraped_at.desc()).all()
 
 
 # ------------------------------------------------------------------ analytics
@@ -490,24 +523,16 @@ def get_analytics(
     sub_category_id: int,
     brand: Optional[str] = None,
     buyer_id: Optional[int] = None,
+    gender: Optional[Gender] = None,
     db: Session = Depends(get_db),
 ):
-    """Deliberately simple: price distribution and per-brand counts only.
-    No gap analysis, no AI attribute extraction, no opportunity scoring --
-    there is no Suburbia-equivalent baseline to compare against for an
-    arbitrary category, so this just summarizes what was found, per the
-    original request for this feature.
-
-    Price distribution is grouped BY CURRENCY (never blended across
-    currencies -- same fix already applied on the Suburbia side after a
-    real bug there mixed MXN and USD numbers into one meaningless
-    average), uses MRP via compute_mrp() (never a discounted price), and
-    does not include "median" (removed per explicit request)."""
-    q = db.query(GenericProduct).filter(GenericProduct.sub_category_id == sub_category_id)
+    q = db.query(Product).filter(Product.sub_category_id == sub_category_id)
     if brand:
-        q = q.filter(GenericProduct.brand == brand)
+        q = q.filter(Product.brand == brand)
     if buyer_id is not None:
-        q = q.filter(GenericProduct.buyer_id == buyer_id)
+        q = q.filter(Product.buyer_id == buyer_id)
+    if gender is not None:
+        q = q.filter(Product.gender == gender)
     products = q.all()
 
     by_brand: dict[str, int] = {}

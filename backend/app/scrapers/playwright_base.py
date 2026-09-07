@@ -104,6 +104,7 @@ class PlaywrightScraper:
         self,
         url: str,
         wait_selector: Optional[str] = None,
+        wait_selector_hidden: Optional[str] = None,
         wait_ms: int = 1500,
         scroll: bool = False,
         check_blocked: bool = True,
@@ -116,6 +117,22 @@ class PlaywrightScraper:
 
         wait_selector: CSS selector to wait for before considering the page
             "loaded". Strongly preferred over a blind wait_ms.
+        wait_selector_hidden: CSS selector to wait to DISAPPEAR (e.g. a
+            loading spinner) before considering the page ready. This is a
+            DIFFERENT signal than wait_until="networkidle" and catches a
+            failure mode networkidle can't: confirmed live on Textilon (a
+            Vue SPA) -- the network genuinely went idle (the product-count/
+            pagination data had already arrived and rendered) while the
+            product-card grid itself stayed empty, because the site's own
+            client-side render of the card list finishes some time AFTER
+            its data fetch resolves (e.g. a fixed minimum spinner duration,
+            or per-card image preloading before mount). Waiting for the
+            spinner element itself to become hidden/detached is a direct
+            signal tied to the actual thing we care about, instead of an
+            indirect inference from network timing. Never raises if the
+            selector never disappears (e.g. a real, permanent no-results
+            state) -- falls through and lets the caller's own
+            missing-mandatory-field checks catch an empty result cleanly.
         wait_ms: fallback/extra settle time after navigation.
         scroll: set True for infinite-scroll category pages.
         wait_until: Playwright's navigation-completion condition, passed
@@ -131,7 +148,10 @@ class PlaywrightScraper:
             arrived. Pass "networkidle" for exactly this situation --
             waits until there's been no network activity for 500ms,
             which is the standard Playwright signal that an SPA's async
-            data-loading has actually finished.
+            data-loading has actually finished. NOTE (confirmed live,
+            2026-09-07): networkidle is necessary but not always
+            sufficient -- see wait_selector_hidden above for the failure
+            mode it doesn't cover.
         debug_save_path: if given, writes the raw rendered HTML to this
             local file path (relative to the current working directory)
             regardless of success/failure -- this is the fastest way to
@@ -175,6 +195,18 @@ class PlaywrightScraper:
                     # Selector might legitimately not exist on this page
                     # (e.g. an out-of-stock product with a different
                     # layout) -- let the caller's parsing decide.
+                    pass
+
+            if wait_selector_hidden:
+                try:
+                    page.wait_for_selector(
+                        wait_selector_hidden, state="hidden", timeout=self.timeout_ms
+                    )
+                except Exception:
+                    # Never raise here: either the spinner genuinely never
+                    # disappears (a real, permanent empty/no-results state
+                    # -- let the caller's missing-field checks handle that
+                    # cleanly) or it was never present to begin with.
                     pass
 
             if scroll:

@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const COMMON_CURRENCIES = ["USD", "MXN", "EUR", "GBP", "BRL", "INR"];
+const GENDERS = [
+  { value: "", label: "Not specified" },
+  { value: "WOMENS", label: "Women's" },
+  { value: "MENS", label: "Men's" },
+  { value: "UNISEX", label: "Unisex" },
+  { value: "KIDS", label: "Kids" },
+];
 
 export default function AddBrand() {
   const [searchParams] = useSearchParams();
@@ -23,6 +30,7 @@ export default function AddBrand() {
   const [brand, setBrand] = useState("");
   const [url, setUrl] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [gender, setGender] = useState("");
   const [notes, setNotes] = useState("");
 
   const [itemType, setItemType] = useState("");
@@ -102,6 +110,7 @@ export default function AddBrand() {
           category_url: url,
           role,
           currency,
+          gender: gender || null,
           notes: notes || null,
           buyer_id: resolvedBuyerId,
         };
@@ -300,6 +309,30 @@ export default function AddBrand() {
           </div>
         )}
 
+        {/* Gender -- a real field, not a workaround typed into the brand name
+            or notes. This is what lets the same brand + category be
+            registered twice for genuinely different product lines (e.g.
+            Men's vs Women's Pajamas) without one silently colliding with
+            the other. */}
+        {entryMode === "new" && (
+        <div>
+          <label className="block text-sm font-medium mb-2">Gender / product line</label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+          >
+            {GENDERS.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-neutral-400 mt-1">
+            Set this whenever a brand has separate men's/women's/kids lines in the same
+            category (e.g. Pajamas) -- otherwise the two can be scraped as if they were one.
+          </p>
+        </div>
+        )}
+
         {/* Category picker -- not needed when attaching an already-searched brand, it already has one */}
         {entryMode === "new" && (
         <div>
@@ -394,7 +427,7 @@ export default function AddBrand() {
         {entryMode === "new" && (
         <div className="flex gap-4">
           <div className="w-32">
-            <label className="block text-sm font-medium mb-2">Currency</label>
+            <label className="block text-sm font-medium mb-2">Currency (fallback)</label>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
@@ -404,6 +437,10 @@ export default function AddBrand() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            <p className="text-xs text-neutral-400 mt-1">
+              We read the real currency off each product's page automatically. This is only
+              used if a page gives no usable signal at all.
+            </p>
           </div>
           <div className="flex-1">
             <label className="block text-sm font-medium mb-2">Notes (optional)</label>
@@ -436,7 +473,8 @@ export default function AddBrand() {
             <div className="space-y-3">
               <div>
                 ✓ Added <strong>{result.source.brand}</strong> ({result.source.role === "BUYER" ? "buyer" : "competitor"})
-                under {result.source.item_type} / {result.source.category} / {result.source.sub_category}.
+                under {result.source.item_type} / {result.source.category} / {result.source.sub_category}
+                {result.source.gender ? ` (${result.source.gender.toLowerCase()})` : ""}.
               </div>
               <div className="flex items-center gap-3">
                 <button
