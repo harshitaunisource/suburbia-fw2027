@@ -2,43 +2,66 @@
 Phase for the category explorer: scrapes a single GenericSourceConfig
 (one brand + category URL + gender for one sub-category).
 
-2026-09-07 REWRITE -- three structural changes, no AI/LLM involved in
-any of them:
+2026-09-07 ASYNC REWRITE -- the earlier synchronous version (one HTTP
+request that stayed open for the entire scrape) kept hitting a hard
+wall: Vercel's proxy kills any request around ~120s, but fetching many
+product pages one at a time (confirmed live: GymShark, Walmart) easily
+takes longer than that -- the proxy would then kill the connection and
+return its own generic HTML error page, even though the scrape itself
+was working correctly the whole time.
 
-  1. Link discovery no longer relies on a single hand-tuned regex as
-     the primary mechanism. app/scrapers/link_discovery.py tries (a) the
-     category page's own JSON-LD ItemList, then (b) structural URL-shape
-     clustering, then (c) a configured override, then (d) the old
-     generic default regex -- in that order. A brand's
-     `pdp_link_pattern` is still honored if set, but it's no longer the
-     only way forward when it's missing or wrong.
+The fix is architectural, not a bigger timeout: this is now split into
+two pieces --
+
+  1. create_scrape_run() -- fast, synchronous. Creates the run row and
+     returns immediately (well under a second). This is what the HTTP
+     request actually waits for now.
+
+  2. execute_scrape() -- the slow part (the real work: fetching the
+     category page, discovering links, fetching every product page).
+     This runs as a FastAPI BackgroundTask, AFTER the HTTP response
+     has already been sent -- so no proxy timeout can ever kill it,
+     because no single request stays open for it.
+
+The frontend now POSTs /scrape (gets an immediate "running" row back),
+then polls GET /scrape-runs/{id} every couple of seconds until the
+status changes to "success" or "failed". See routers/generic.py for
+the endpoint wiring and SearchProducts.jsx for the polling loop.
+
+run_generic_scrape_background() is the actual function handed to
+BackgroundTasks.add_task() -- it opens its OWN database session,
+because the request-scoped session (from Depends(get_db)) is closed as
+soon as the HTTP response is sent, long before this function actually
+runs.
+
+Everything else about the scraping logic itself is unchanged from the
+previous rewrite:
+
+  1. Link discovery tries (a) the category page's own JSON-LD ItemList,
+     then (b) structural URL-shape clustering, then (c) a configured
+     override, then (d) the old generic default regex -- in that order.
 
   2. Products are written into the unified `Product` table (not the
-     separate GenericProduct table) -- see models.py's 2026-09-07 notes.
-     This is what makes anything scraped here show up on the classic
-     Products page, Market Analytics, and Buyer Opportunities without
-     any extra step. `role`/`buyer_id`/`sub_category_id`/`gender` ride
-     along on the same row Product.category/subcategory always had.
+     separate GenericProduct table) -- see models.py's notes.
 
   3. `gender` (from the source config) is stamped onto every product
-     this run produces -- this is what actually prevents a Textilon
-     men's/women's collision going forward: the two source configs are
-     distinguished by gender, so their products never merge into one
-     undifferentiated pile.
+     this run produces.
 
-Currency is no longer taken as-is from the source config -- it's
-detected per-product from the page itself (see currency_detect.py
-via parse_generic_product); the config's `currency` field is only the
-last-resort fallback when the page gives no signal at all.
+Currency is detected per-product from the page itself (see
+currency_detect.py via parse_generic_product); the source config's
+`currency` field is only the last-resort fallback when the page gives
+no signal at all.
 """
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.database import SessionLocal
 from app.models import GenericScrapeRun, GenericSourceConfig, ItemHierarchy, Product
 from app.scrapers._generic_playwright_template import parse_generic_product
 from app.scrapers._generic_playwright_template import (
@@ -48,7 +71,60 @@ from app.scrapers.base import STORAGE_ROOT, ScraperError
 from app.scrapers.link_discovery import DEFAULT_PDP_LINK_PATTERN, discover_product_links
 from app.scrapers.playwright_base import PlaywrightScraper
 
-__all__ = ["DEFAULT_PDP_LINK_PATTERN", "run_generic_scrape", "scrape_single_product_url"]
+__all__ = [
+    "DEFAULT_PDP_LINK_PATTERN",
+    "create_scrape_run",
+    "execute_scrape",
+    "run_generic_scrape",
+    "run_generic_scrape_background",
+    "scrape_single_product_url",
+]
+
+# Safety-valve ceiling on total scrape duration -- no longer tied to a
+# platform proxy timeout (background execution isn't blocked by that
+# anymore), just a sane upper bound so a pathological site (e.g. a
+# broken pagination loop that keeps finding "new" candidates) can't run
+# forever. Generous on purpose: correctness over speed now that nothing
+# is waiting on this synchronously.
+MAX_SCRAPE_SECONDS = 240
+
+
+def create_scrape_run(db: Session, source_config: GenericSourceConfig) -> GenericScrapeRun:
+    """The FAST, synchronous part -- creates the run row and returns
+    immediately. This is what the HTTP request actually waits for."""
+    run = GenericScrapeRun(
+        sub_category_id=source_config.sub_category_id,
+        source_config_id=source_config.id,
+        status="running",
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def run_generic_scrape_background(source_config_id: int, run_id: int) -> None:
+    """Entry point for BackgroundTasks.add_task(). Opens its OWN
+    database session -- the request-scoped session from the endpoint
+    that scheduled this is closed as soon as the HTTP response is
+    sent, long before this function actually runs."""
+    db = SessionLocal()
+    try:
+        source_config = db.get(GenericSourceConfig, source_config_id)
+        run = db.get(GenericScrapeRun, run_id)
+        if not source_config or not run:
+            return
+        execute_scrape(db, source_config, run)
+    finally:
+        db.close()
+
+
+def run_generic_scrape(db: Session, source_config: GenericSourceConfig) -> GenericScrapeRun:
+    """Synchronous convenience wrapper (create + execute back-to-back)
+    -- kept for anything that still wants a single blocking call (e.g.
+    a script or a test), not used by the HTTP endpoint anymore."""
+    run = create_scrape_run(db, source_config)
+    return execute_scrape(db, source_config, run)
 
 
 def scrape_single_product_url(db: Session, source_config: GenericSourceConfig, product_url: str) -> Product:
@@ -62,7 +138,8 @@ def scrape_single_product_url(db: Session, source_config: GenericSourceConfig, p
     browser, copy a product's URL, and add it directly -- reusing the
     exact same domain-override-aware parsing (title selector, wait
     time, currency detection, etc.) that the category-driven flow uses,
-    just without needing link discovery to have found it first.
+    just without needing link discovery to have found it first. A
+    single page is fast enough that this stays synchronous.
     """
     hierarchy: ItemHierarchy = db.get(ItemHierarchy, source_config.sub_category_id)
     category_value = hierarchy.sub_category.lower()
@@ -140,16 +217,16 @@ def scrape_single_product_url(db: Session, source_config: GenericSourceConfig, p
             pass
 
 
-def run_generic_scrape(db: Session, source_config: GenericSourceConfig, max_products: int = 60) -> GenericScrapeRun:
+def execute_scrape(
+    db: Session, source_config: GenericSourceConfig, run: GenericScrapeRun, max_products: int = 60
+) -> GenericScrapeRun:
+    """The SLOW part -- category page fetch, link discovery, then every
+    product page. This is what runs as a background task, after the
+    HTTP response for the /scrape request has already been sent.
+    `run` is an existing (already-committed, status="running") row --
+    this function updates it in place rather than creating a new one.
+    """
     hierarchy: ItemHierarchy = db.get(ItemHierarchy, source_config.sub_category_id)
-    run = GenericScrapeRun(
-        sub_category_id=source_config.sub_category_id,
-        source_config_id=source_config.id,
-        status="running",
-    )
-    db.add(run)
-    db.commit()
-    db.refresh(run)
 
     keywords = [k.strip() for k in (hierarchy.sanity_keywords or "").split(",") if k.strip()]
     # Consistent with how Suburbia's own scrapers populate Product.category
@@ -204,7 +281,22 @@ def run_generic_scrape(db: Session, source_config: GenericSourceConfig, max_prod
                 )
 
             found = new_count = images_ok = images_failed = 0
+            stopped_early = False
+            # Safety-valve wall-clock budget -- see MAX_SCRAPE_SECONDS's
+            # module-level comment. This is no longer about dodging a
+            # proxy timeout (background execution isn't blocked by
+            # that); it's just a sane ceiling against a pathological
+            # run that would otherwise never finish.
+            scrape_started_at = time.monotonic()
             for i, purl in enumerate(product_urls, start=1):
+                if time.monotonic() - scrape_started_at > MAX_SCRAPE_SECONDS:
+                    stopped_early = True
+                    print(f"[generic:{source_config.brand}] stopping early at {MAX_SCRAPE_SECONDS}s "
+                          f"safety-valve budget -- {found} saved so far, "
+                          f"{len(product_urls) - i + 1} candidates not yet tried. Re-run the search "
+                          f"to pick up where this left off (already-saved products are skipped "
+                          f"automatically).", flush=True)
+                    break
                 try:
                     product_html = scraper.get_rendered_html(
                         purl,
@@ -228,9 +320,9 @@ def run_generic_scrape(db: Session, source_config: GenericSourceConfig, max_prod
                     # feeds -- see the routers/frontend pages). Price is
                     # kept as a soft "nice to have" (shown when present,
                     # never blocks a save). Composition/material is NOT
-                    # required at all anymore -- plenty of real product
-                    # pages simply don't expose it in scrapeable text
-                    # (behind an accordion, a PDF spec sheet, etc.), and
+                    # required at all -- plenty of real product pages
+                    # simply don't expose it in scrapeable text (behind
+                    # an accordion, a PDF spec sheet, etc.), and
                     # requiring it was silently discarding real, usable
                     # products that had a perfectly good name/image/price.
                     missing = []
@@ -304,6 +396,13 @@ def run_generic_scrape(db: Session, source_config: GenericSourceConfig, max_prod
             run.products_new = new_count
             run.images_downloaded = images_ok
             run.images_failed = images_failed
+            if stopped_early:
+                run.error_message = (
+                    f"Stopped after {MAX_SCRAPE_SECONDS}s safety-valve budget -- saved {found} "
+                    f"product(s) before stopping, out of {len(product_urls)} candidates found. "
+                    f"Run the search again to pick up where this left off; already-saved "
+                    f"products are skipped automatically."
+                )
             run.finished_at = datetime.utcnow()
             db.commit()
             return run

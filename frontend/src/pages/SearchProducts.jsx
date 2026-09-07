@@ -143,21 +143,33 @@ export default function SearchProducts() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_config_id: source.id }),
       });
-      const run = await scrapeRes.json();
+      let run = await scrapeRes.json();
+      if (!scrapeRes.ok) throw new Error(run.detail || "Couldn't start the scrape.");
       setLastRun(run);
+
+      // The scrape now runs in the BACKGROUND on the server -- this
+      // POST returns almost instantly with status "running", not the
+      // finished result. Poll until it's actually done instead of
+      // trusting the immediate response. This is what makes a slow
+      // site (many product pages) survive: no single request stays
+      // open long enough for a platform proxy to kill it (confirmed
+      // live: GymShark and Walmart both got killed by Vercel's ~120s
+      // proxy timeout under the old one-long-request design).
+      while (run.status === "running") {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const pollRes = await fetch(`/api/generic/scrape-runs/${run.id}`);
+        if (!pollRes.ok) throw new Error("Lost track of the scrape run -- try searching again.");
+        run = await pollRes.json();
+        setLastRun(run);
+      }
       setElapsedMs(Date.now() - startedAt);
-      // Backend always returns HTTP 200 for /scrape, even when the run
-      // itself failed (status: "failed" with a real error_message) --
-      // that's intentional (a failed run is still a valid, complete API
-      // response, not a server error). Checking scrapeRes.ok ALONE was
-      // the actual bug behind every "nothing happens, no error shown"
-      // report: a genuinely failed run (e.g. "no product links found")
-      // was silently treated as success, the code moved on to fetch
-      // /products, got back [], and since lastRun.status was "failed"
-      // (not "success"), NEITHER the green nor the amber box matched --
-      // nothing rendered at all, with no visible error anywhere.
-      if (!scrapeRes.ok || run.status === "failed") {
-        throw new Error(run.error_message || run.detail || "Scrape failed.");
+
+      // Backend reports a failed run as a normal 200 response with
+      // status: "failed" and a real error_message (a failed run is
+      // still a valid, complete result, not a server error) -- so the
+      // check here is on run.status, not on any HTTP status code.
+      if (run.status === "failed") {
+        throw new Error(run.error_message || "Scrape failed.");
       }
 
       const prodParams = new URLSearchParams({ sub_category_id: source.sub_category_id, brand: source.brand });
@@ -411,8 +423,9 @@ export default function SearchProducts() {
 
         {searching && (
           <div className="text-xs text-neutral-500">
-            Loading the page and scanning it for products — this usually takes 10–60 seconds
-            depending on the site.
+            Loading the page and scanning it for products — this runs in the background and can
+            take a few minutes for a large category. Feel free to leave this tab open; it'll
+            update automatically when it's done.
           </div>
         )}
 
@@ -423,17 +436,20 @@ export default function SearchProducts() {
           </div>
         )}
         {lastRun && lastRun.status === "success" && lastRun.products_found > 0 && (
-  <div className="text-sm text-green-700">
-    ✓ Found {lastRun.products_found} product{lastRun.products_found === 1 ? "" : "s"}
-    {elapsedMs != null && ` in ${(elapsedMs / 1000).toFixed(1)}s`}.
-    {products.length > 0 && (
-      <span className="block text-neutral-600 mt-1">
-        {products.slice(0, 8).map((p) => p.product_name).join(", ")}
-        {products.length > 8 ? `, +${products.length - 8} more` : ""}
-      </span>
-    )}
-  </div>
-)}
+          <div className="text-sm text-green-700">
+            ✓ Found {lastRun.products_found} product{lastRun.products_found === 1 ? "" : "s"}
+            {elapsedMs != null && ` in ${(elapsedMs / 1000).toFixed(1)}s`}.
+            {products.length > 0 && (
+              <span className="block text-neutral-600 mt-1">
+                {products.slice(0, 8).map((p) => p.product_name).join(", ")}
+                {products.length > 8 ? `, +${products.length - 8} more` : ""}
+              </span>
+            )}
+            {lastRun.error_message && (
+              <span className="block text-amber-700 mt-1">⚠ {lastRun.error_message}</span>
+            )}
+          </div>
+        )}
         {lastRun && lastRun.status === "success" && lastRun.products_found === 0 && (
           <div className="text-sm text-amber-700 bg-amber-50 rounded-md p-3">
             The page loaded fine, but nothing matched as a product

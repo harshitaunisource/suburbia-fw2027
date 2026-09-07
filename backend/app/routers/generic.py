@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, computed_field
 from sqlalchemy.orm import Session
 
@@ -27,7 +27,9 @@ from app.models import (
     Product,
     SourceRole,
 )
-from app.services.generic_scraper import DEFAULT_PDP_LINK_PATTERN, run_generic_scrape, scrape_single_product_url
+from app.services.generic_scraper import (
+    DEFAULT_PDP_LINK_PATTERN, create_scrape_run, run_generic_scrape_background, scrape_single_product_url,
+)
 from app.services.pricing import compute_mrp
 from app.scrapers.base import ScraperError
 
@@ -459,11 +461,31 @@ def delete_source(source_id: int, db: Session = Depends(get_db)):
 
 # ------------------------------------------------------------------ scraping
 @router.post("/scrape", response_model=ScrapeRunOut)
-def trigger_scrape(req: TriggerScrapeRequest, db: Session = Depends(get_db)):
+def trigger_scrape(req: TriggerScrapeRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Returns almost immediately with a "running" run row -- the
+    actual scrape happens AFTER this response is sent, as a background
+    task (see run_generic_scrape_background). This is what makes a
+    slow site (many product pages, each 1.5-8s) survive a platform
+    proxy's request timeout: no single HTTP request stays open for the
+    whole scrape anymore. The frontend polls GET /scrape-runs/{id}
+    every couple of seconds until status changes to "success" or
+    "failed"."""
     source = db.get(GenericSourceConfig, req.source_config_id)
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    run = run_generic_scrape(db, source)
+    run = create_scrape_run(db, source)
+    background_tasks.add_task(run_generic_scrape_background, source.id, run.id)
+    return run
+
+
+@router.get("/scrape-runs/{run_id}", response_model=ScrapeRunOut)
+def get_scrape_run(run_id: int, db: Session = Depends(get_db)):
+    """Polling endpoint for a single run's current status -- see
+    trigger_scrape's docstring for the background-task flow this
+    supports."""
+    run = db.get(GenericScrapeRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
     return run
 
 
