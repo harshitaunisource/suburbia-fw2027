@@ -3,12 +3,25 @@ import CartBar from "../components/CartBar";
 import { cartItemFromGenericProduct, useCart } from "../lib/cart";
 
 function imageSrc(p) {
+  // Prefer the ORIGINAL remote image_url (the brand's own CDN link) over
+  // the locally-downloaded copy. A locally-downloaded file only exists
+  // on whichever machine/container actually ran the scrape -- on a
+  // stateless deployment (Railway) with a shared external database,
+  // that's almost never the same machine serving the request, so
+  // local_image_path routinely 404s in production even though the row
+  // itself is visible everywhere. image_url is a normal CDN link and
+  // displays fine hotlinked in a browser <img> tag regardless of which
+  // server rendered the page -- that's the whole reason the local-
+  // download step exists at all (some sites block a Python SCRIPT from
+  // downloading, not a browser from displaying), not a signal that the
+  // local copy is more reliable to show.
+  if (p.image_url) return p.image_url;
   if (p.local_image_path) {
     const normalized = p.local_image_path.replace(/\\/g, "/");
     const idx = normalized.indexOf("storage/");
     return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
   }
-  return p.image_url || null;
+  return null;
 }
 
 export default function SearchProducts() {
