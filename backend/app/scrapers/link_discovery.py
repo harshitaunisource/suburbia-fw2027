@@ -92,7 +92,19 @@ def discover_via_jsonld(html: str, base_url: str) -> list[str]:
         for block in blocks:
             if not isinstance(block, dict):
                 continue
-            items = block.get("itemListElement") or (block.get("mainEntity") or {}).get("itemListElement")
+            # block.get("mainEntity") is sometimes a plain LIST of
+            # Product entities directly (confirmed live on GymShark's
+            # Shopify theme), not always wrapped in an ItemList object.
+            # Calling .get() on that list crashed with
+            # "'list' object has no attribute 'get'" -- guard by type
+            # instead of assuming mainEntity is always a dict.
+            items = block.get("itemListElement")
+            if not items:
+                main_entity = block.get("mainEntity")
+                if isinstance(main_entity, dict):
+                    items = main_entity.get("itemListElement")
+                elif isinstance(main_entity, list):
+                    items = main_entity
             if not items:
                 continue
             for entry in items:
