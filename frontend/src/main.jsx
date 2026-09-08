@@ -13,6 +13,7 @@ import Catalogue from "./pages/Catalogue";
 import ExploreCategories from "./pages/ExploreCategories";
 import BrandSetup from "./pages/BrandSetup";
 import AddBrand from "./pages/AddBrand";
+import ImportSpreadsheet from "./pages/ImportSpreadsheet";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
@@ -21,6 +22,7 @@ const NAV = [
   { to: "/data-collection", label: "Data Collection" },
   { to: "/products", label: "Products" },
   { to: "/search-products", label: "Search Products" },
+  { to: "/import-spreadsheet", label: "Import Spreadsheet" },
   { to: "/analytics", label: "Market Analytics" },
   { to: "/opportunities", label: "Buyer Opportunities" },
   { to: "/our-products", label: "Our Products" },
@@ -61,6 +63,7 @@ function Shell() {
             <Route path="/data-collection" element={<DataCollection />} />
             <Route path="/products" element={<Products />} />
             <Route path="/search-products" element={<SearchProducts />} />
+            <Route path="/import-spreadsheet" element={<ImportSpreadsheet />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/opportunities" element={<BuyerOpportunities />} />
             <Route path="/our-products" element={<OurProducts />} />
