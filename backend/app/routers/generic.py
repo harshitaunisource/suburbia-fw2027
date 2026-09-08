@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, computed_field
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,7 @@ from app.models import (
 from app.services.generic_scraper import (
     DEFAULT_PDP_LINK_PATTERN, create_scrape_run, run_generic_scrape_background, scrape_single_product_url,
 )
+from app.services.spreadsheet_import import import_spreadsheet
 from app.services.pricing import compute_mrp
 from app.scrapers.base import ScraperError
 
@@ -510,6 +511,59 @@ def add_product_by_url(req: AddProductByUrlRequest, db: Session = Depends(get_db
     except ScraperError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return product
+
+
+@router.post("/products/import-spreadsheet")
+async def import_spreadsheet_endpoint(
+    file: UploadFile = File(...),
+    brand: str = Form(...),
+    sub_category_id: int = Form(...),
+    role: SourceRole = Form(SourceRole.COMPETITOR),
+    gender: Optional[Gender] = Form(None),
+    buyer_id: Optional[int] = Form(None),
+    buyer_name: Optional[str] = Form(None),
+    currency_fallback: str = Form("USD"),
+    has_header_row: bool = Form(True),
+    name_col: int = Form(...),
+    price_col: Optional[int] = Form(None),
+    original_price_col: Optional[int] = Form(None),
+    image_col: Optional[int] = Form(None),
+    product_url_col: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """Upload a CSV or XLSX export (e.g. from the Web Scraper Chrome
+    extension) and have it parsed straight into real products, instead
+    of needing a hand-written one-off import script per brand -- see
+    app/services/spreadsheet_import.py for the full column-mapping and
+    currency-detection logic."""
+    content = await file.read()
+    try:
+        result = import_spreadsheet(
+            db,
+            filename=file.filename,
+            content=content,
+            brand=brand,
+            sub_category_id=sub_category_id,
+            role=role,
+            gender=gender,
+            buyer_id=buyer_id,
+            buyer_name=buyer_name,
+            currency_fallback=currency_fallback,
+            has_header_row=has_header_row,
+            name_col=name_col,
+            price_col=price_col,
+            original_price_col=original_price_col,
+            image_col=image_col,
+            product_url_col=product_url_col,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "inserted": result.inserted,
+        "skipped": result.skipped,
+        "errors": result.errors[:50],  # cap so one bad file can't return a huge payload
+        "error_count": len(result.errors),
+    }
 
 
 @router.get("/scrape-runs", response_model=list[ScrapeRunOut])

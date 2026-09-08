@@ -41,7 +41,7 @@ import uuid
 from datetime import datetime
 
 from app.database import SessionLocal
-from app.models import Buyer, Gender, GenericSourceConfig, ItemHierarchy, Product, SourceRole
+from app.models import Buyer, Gender, GenericSourceConfig, ImageKind, ItemHierarchy, Product, SourceRole
 
 BRAND = "Textilon"
 CURRENCY = "BOB"
@@ -339,6 +339,11 @@ def import_data():
                         source_config_id=source.id,
                         buyer_id=buyer.id,
                         role=SourceRole.BUYER,
+                        # Bug fix: this field was previously never set,
+                        # which silently defaulted every one of these
+                        # rows to COMPETITOR_IMAGE despite Textilon
+                        # being a buyer -- see models.py's ImageKind.
+                        image_kind=ImageKind.OUR_PRODUCT,
                         gender=group["gender"],
                         product_name=name,
                         product_code=code,

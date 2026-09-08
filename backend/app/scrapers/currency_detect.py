@@ -65,6 +65,21 @@ DOLLAR_TLD_MAP = {
 
 KR_TLD_MAP = {"se": "SEK", "no": "NOK", "dk": "DKK"}
 
+# Path/query locale markers for sites that serve a Mexico storefront
+# under a path prefix on a plain .com domain rather than a .mx
+# country-code TLD -- confirmed live: zara.com/mx/es/... and
+# www2.hm.com/es_mx/... both do this. Checked BEFORE the TLD lookup
+# for a bare "$", since TLD alone misses both of these real cases.
+MX_PATH_MARKERS = ("/mx/", "_mx/", "-mx/", "es_mx", "es-mx", "/mx-", "mx_es", "mx/es")
+
+# Domains that are Mexico-exclusive retailers with NO locale signal
+# anywhere in their URL at all -- no .mx TLD, no /mx/ path marker.
+# Confirmed live: coppel.com (a plain .com domain, path like
+# "/ct/mujeres/sueteres-capas/cat002305" has nothing MX-specific in
+# it) would otherwise fall all the way through to the hardcoded USD
+# default for a bare "$", despite being a 100%-Mexico storefront.
+MX_ONLY_DOMAINS = {"coppel.com", "www.coppel.com"}
+
 # Explicit 3-letter ISO codes we accept if found verbatim in text near
 # a price (case-insensitive). Deliberately a fixed allowlist rather
 # than "any 3 uppercase letters" -- that would false-positive on
@@ -126,13 +141,27 @@ def detect_currency(
                 return KR_TLD_MAP.get(tld, code)
             return code
 
-    # 3. Bare "$" -- ambiguous, resolve via domain TLD first, then
-    #    html lang, then the explicit fallback.
+    # 3. Bare "$" -- ambiguous, resolve via URL PATH locale markers
+    #    first (e.g. zara.com/mx/es/..., www2.hm.com/es_mx/... -- both
+    #    serve a Mexico storefront under a path prefix on a plain
+    #    .com domain, not a .mx country-code TLD, so TLD-only
+    #    detection silently missed these and fell through to a
+    #    hardcoded USD default. This is exactly the "MXN counted as
+    #    USD" risk -- both use the same bare "$" symbol, and only the
+    #    URL tells them apart), then domain TLD, then html lang, then
+    #    the explicit fallback.
     if "$" in price_text or "US$" in price_text or "MX$" in price_text:
         if "MX$" in price_text:
             return "MXN"
         if "US$" in price_text:
             return "USD"
+
+        path_and_query = (urlparse(url).path + "?" + urlparse(url).query).lower()
+        if any(marker in path_and_query for marker in MX_PATH_MARKERS):
+            return "MXN"
+        if urlparse(url).netloc.lower() in MX_ONLY_DOMAINS:
+            return "MXN"
+
         tld = _tld_of(url)
         if tld in DOLLAR_TLD_MAP:
             return DOLLAR_TLD_MAP[tld]

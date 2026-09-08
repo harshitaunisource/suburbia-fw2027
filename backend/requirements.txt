@@ -16,6 +16,7 @@ python-pptx==1.0.2
 openpyxl==3.1.5
 openai
 
+
 # IMPORTANT: this project needs Python 3.12 (or 3.11) -- NOT 3.13/3.14.
 # greenlet (a sqlalchemy dependency) and pydantic-core have no prebuilt
 # wheels for 3.14 at the time this was written, so pip tries to compile

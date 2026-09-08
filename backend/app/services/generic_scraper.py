@@ -68,7 +68,7 @@ from app.scrapers._generic_playwright_template import (
     category_wait_hidden_for, category_wait_until_for, keywords_match, wait_ms_for, wait_selector_for,
 )
 from app.scrapers.base import STORAGE_ROOT, ScraperError
-from app.scrapers.link_discovery import DEFAULT_PDP_LINK_PATTERN, discover_product_links
+from app.scrapers.link_discovery import DEFAULT_PDP_LINK_PATTERN, discover_product_links, find_next_page_url
 from app.scrapers.playwright_base import PlaywrightScraper
 
 __all__ = [
@@ -295,6 +295,58 @@ def execute_scrape(
                     f"an unusual link shape, set pdp_link_pattern on this source as a manual override."
                 )
 
+            # Follow pagination -- a category can have far more products
+            # than fit on one page (confirmed live: 180 Shop, 37 real
+            # products across 7 pages, only 10 found when only page 1
+            # was ever fetched). Keep going until either we run out of
+            # "next page" links, hit MAX_PAGINATION_PAGES, or a page
+            # adds no NEW product URLs (a broken/looping "next" link
+            # shouldn't spin forever).
+            MAX_PAGINATION_PAGES = 8
+            seen_urls = set(product_urls)
+            current_html, current_page_url, page_num = html, source_config.category_url, 1
+            while len(product_urls) < max_products and page_num < MAX_PAGINATION_PAGES:
+                next_url = find_next_page_url(current_html, current_page_url)
+                if not next_url or next_url == current_page_url:
+                    break
+                page_num += 1
+                run.current_step = f"Loading page {page_num} of {source_config.brand}'s category..."
+                db.commit()
+                try:
+                    next_html = scraper.get_rendered_html(
+                        next_url,
+                        wait_ms=wait_ms_for(next_url, default=4000),
+                        scroll=True,
+                        wait_until=category_wait_until_for(next_url),
+                        wait_selector_hidden=category_wait_hidden_for(next_url),
+                    )
+                except Exception as e:
+                    print(f"[generic:{source_config.brand}] pagination stopped -- couldn't load "
+                          f"page {page_num}: {e}", flush=True)
+                    break
+                next_urls, _ = discover_product_links(
+                    next_html,
+                    base_url=next_url,
+                    configured_pattern=source_config.pdp_link_pattern,
+                    max_links=max_products,
+                )
+                new_ones = [u for u in next_urls if u not in seen_urls]
+                if not new_ones:
+                    print(f"[generic:{source_config.brand}] pagination stopped at page {page_num} "
+                          f"-- no new products found (likely the real last page).", flush=True)
+                    break
+                for u in new_ones:
+                    seen_urls.add(u)
+                    product_urls.append(u)
+                print(f"[generic:{source_config.brand}] page {page_num}: +{len(new_ones)} "
+                      f"new candidate(s), {len(product_urls)} total so far", flush=True)
+                current_html, current_page_url = next_html, next_url
+
+            product_urls = product_urls[:max_products]
+            run.candidates_total = len(product_urls)
+            run.current_step = f"Found {len(product_urls)} candidate product(s) -- checking each one now..."
+            db.commit()
+
             found = new_count = images_ok = images_failed = 0
             stopped_early = False
             # Safety-valve wall-clock budget -- see MAX_SCRAPE_SECONDS's
@@ -333,6 +385,16 @@ def execute_scrape(
                                   f"(no {hierarchy.sub_category} keyword match): {parsed.product_name}", flush=True)
                             continue
 
+                    # Only name + image + link are truly required for a
+                    # catalogue/PPT picker (which is what this actually
+                    # feeds -- see the routers/frontend pages). Price is
+                    # kept as a soft "nice to have" (shown when present,
+                    # never blocks a save). Composition/material is NOT
+                    # required at all -- plenty of real product pages
+                    # simply don't expose it in scrapeable text (behind
+                    # an accordion, a PDF spec sheet, etc.), and
+                    # requiring it was silently discarding real, usable
+                    # products that had a perfectly good name/image/price.
                     # No mandatory-field gate at all, per instruction:
                     # save whatever's actually available -- missing
                     # price/image/material are all fine, a human
