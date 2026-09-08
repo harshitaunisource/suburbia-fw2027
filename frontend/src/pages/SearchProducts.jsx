@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CartBar from "../components/CartBar";
 import { cartItemFromGenericProduct, useCart } from "../lib/cart";
 
@@ -48,6 +48,21 @@ export default function SearchProducts() {
   const [pdpPattern, setPdpPattern] = useState("");
 
   const [searching, setSearching] = useState(false);
+  // Ticking display clock -- separate from elapsedMs (which is only
+  // set once the scrape finishes). This is what makes the "how long
+  // has it been running" text actually update live while polling,
+  // instead of sitting frozen on one static sentence the whole time.
+  const searchStartedAtRef = useRef(null);
+  const [liveElapsedMs, setLiveElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!searching) return;
+    const interval = setInterval(() => {
+      if (searchStartedAtRef.current) {
+        setLiveElapsedMs(Date.now() - searchStartedAtRef.current);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [searching]);
   const [error, setError] = useState(null);
   const [products, setProducts] = useState([]);
   const [lastRun, setLastRun] = useState(null);
@@ -107,6 +122,8 @@ export default function SearchProducts() {
     setLastRun(null);
     setElapsedMs(null);
     const startedAt = Date.now();
+    searchStartedAtRef.current = startedAt;
+    setLiveElapsedMs(0);
     try {
       let source = existingSource && useExisting ? existingSource : null;
       if (!source) {
@@ -422,10 +439,18 @@ export default function SearchProducts() {
         </button>
 
         {searching && (
-          <div className="text-xs text-neutral-500">
-            Loading the page and scanning it for products — this runs in the background and can
-            take a few minutes for a large category. Feel free to leave this tab open; it'll
-            update automatically when it's done.
+          <div className="text-xs text-neutral-500 space-y-1">
+            <div>
+              {lastRun?.current_step || "Starting…"}
+              {" — "}
+              {Math.floor(liveElapsedMs / 1000)}s elapsed
+              {lastRun?.candidates_total ? ` · ${lastRun.candidates_total} candidate(s) found` : ""}
+            </div>
+            <div className="text-neutral-400">
+              Runs in the background, up to ~4 minutes for a large category before it stops itself
+              automatically. Feel free to leave this tab open — this updates every couple of
+              seconds on its own.
+            </div>
           </div>
         )}
 
@@ -444,9 +469,6 @@ export default function SearchProducts() {
                 {products.slice(0, 8).map((p) => p.product_name).join(", ")}
                 {products.length > 8 ? `, +${products.length - 8} more` : ""}
               </span>
-            )}
-            {lastRun.error_message && (
-              <span className="block text-amber-700 mt-1">⚠ {lastRun.error_message}</span>
             )}
           </div>
         )}

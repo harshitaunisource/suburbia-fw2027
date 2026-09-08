@@ -176,6 +176,12 @@ class ScrapeRunOut(BaseModel):
     products_new: int
     error_message: Optional[str] = None
     link_discovery_strategy: Optional[str] = None
+    # Live progress -- see models.py's 2026-09-07 notes. Updated
+    # DURING the scrape (not just once at the end) so the frontend's
+    # polling loop can show real step-by-step status instead of one
+    # static "please wait" message.
+    candidates_total: Optional[int] = None
+    current_step: Optional[str] = None
 
     class Config:
         from_attributes = True

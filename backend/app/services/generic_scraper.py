@@ -167,9 +167,13 @@ def scrape_single_product_url(db: Session, source_config: GenericSourceConfig, p
             category_hint=None, currency=source_config.currency or "USD",
         )
 
-        if not parsed.product_name or not parsed.image_url:
+        # Same relaxed rule as the category-scrape path: only a name is
+        # truly required (and parse_generic_product already guarantees
+        # that or raises) -- missing image/price is fine, saved as-is
+        # for a human to complete later.
+        if not parsed.product_name:
             raise ScraperError(
-                f"Could not find a name and image for {product_url} -- open the debug HTML "
+                f"Could not find a product name for {product_url} -- open the debug HTML "
                 f"file just saved to see what actually rendered."
             )
 
@@ -329,25 +333,22 @@ def execute_scrape(
                                   f"(no {hierarchy.sub_category} keyword match): {parsed.product_name}", flush=True)
                             continue
 
-                    # Only name + image + link are truly required for a
-                    # catalogue/PPT picker (which is what this actually
-                    # feeds -- see the routers/frontend pages). Price is
-                    # kept as a soft "nice to have" (shown when present,
-                    # never blocks a save). Composition/material is NOT
-                    # required at all -- plenty of real product pages
-                    # simply don't expose it in scrapeable text (behind
-                    # an accordion, a PDF spec sheet, etc.), and
-                    # requiring it was silently discarding real, usable
-                    # products that had a perfectly good name/image/price.
-                    missing = []
+                    # No mandatory-field gate at all, per instruction:
+                    # save whatever's actually available -- missing
+                    # price/image/material are all fine, a human
+                    # reviews and completes the data afterward. The
+                    # only thing genuinely required is a product name,
+                    # and parse_generic_product() above already raises
+                    # ScraperError (caught below, this one product is
+                    # skipped, the loop moves on) if it truly cannot
+                    # find any name at all -- so by the time we're
+                    # here, there's always at least a name to show.
                     if not parsed.image_url:
-                        missing.append("image")
-                    if not parsed.product_name:
-                        missing.append("name")
-                    if missing:
-                        print(f"[generic:{source_config.brand}] ({i}/{len(product_urls)}) SKIP "
-                              f"(missing mandatory field(s): {', '.join(missing)}): {parsed.product_name}", flush=True)
-                        continue
+                        print(f"[generic:{source_config.brand}] ({i}/{len(product_urls)}) "
+                              f"(no image found, saving anyway): {parsed.product_name}", flush=True)
+                    if not parsed.price:
+                        print(f"[generic:{source_config.brand}] ({i}/{len(product_urls)}) "
+                              f"(no price found, saving anyway): {parsed.product_name}", flush=True)
 
                     local_path = None
                     if parsed.image_url:
