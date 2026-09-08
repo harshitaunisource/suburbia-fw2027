@@ -34,7 +34,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from typing import Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse, parse_qs, urlunparse
 
 from bs4 import BeautifulSoup
 
@@ -192,6 +192,59 @@ def discover_via_regex(html: str, base_url: str, pattern: str) -> list[str]:
     explicit fallback, not the primary mechanism."""
     links = sorted(set(re.findall(pattern, html)))
     return [urljoin(base_url, link) for link in links]
+
+
+def find_next_page_url(html: str, current_url: str) -> Optional[str]:
+    """Finds the 'next page' URL for a paginated category listing, if
+    one exists -- so a category with more products than fit on one
+    page (confirmed live: 180 Shop, 37 real products across 7 pages,
+    only 10 found when only page 1 was ever fetched) can be followed
+    all the way through instead of silently stopping at page 1.
+
+    Tried in order, most reliable first:
+      1. <link rel="next" href="..."> in the page head -- explicit,
+         standard, and what many storefront themes (including
+         Shopify's) emit for exactly this purpose.
+      2. <a rel="next" href="...">  -- same signal, on the visible
+         pagination control itself.
+      3. A link whose visible text or aria-label is literally "Next"/
+         "Next page"/a right-arrow glyph.
+      4. Shopify's own default pagination URL shape (?page=N) --
+         ONLY attempted if the page's own pagination UI actually shows
+         a link for page N+1's number, never invented blindly (that
+         would risk generating an endless series of empty pages on a
+         site with no real pagination at all).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    link_tag = soup.find("link", rel="next")
+    if link_tag and link_tag.get("href"):
+        return urljoin(current_url, link_tag["href"])
+
+    a_tag = soup.find("a", rel="next")
+    if a_tag and a_tag.get("href"):
+        return urljoin(current_url, a_tag["href"])
+
+    for a in soup.find_all("a", href=True):
+        label = (a.get("aria-label") or "").strip().lower()
+        text = a.get_text(strip=True).lower()
+        if label in ("next", "next page") or text in ("next", "next page", "»", "›", "→"):
+            return urljoin(current_url, a["href"])
+
+    parsed = urlparse(current_url)
+    qs = parse_qs(parsed.query)
+    current_page_str = qs.get("page", ["1"])[0]
+    current_page = int(current_page_str) if current_page_str.isdigit() else 1
+    next_page_text = str(current_page + 1)
+    has_next_page_number = soup.find(
+        "a", string=lambda s: s and s.strip() == next_page_text
+    )
+    if has_next_page_number:
+        qs["page"] = [str(current_page + 1)]
+        new_query = urlencode(qs, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))
+
+    return None
 
 
 def discover_product_links(
