@@ -2,6 +2,23 @@ import { useEffect, useState } from "react";
 import CartBar from "../components/CartBar";
 import { cartItemFromProduct, useCart } from "../lib/cart";
 
+const GENDER_LABELS = {
+  WOMENS: "Women",
+  MENS: "Men",
+  GIRLS: "Girls",
+  BOYS: "Boys",
+  KIDS: "Kids",
+  UNISEX: "Unisex",
+};
+
+// Always offered, regardless of what's currently in the data -- the
+// dynamic /api/products/meta/genders endpoint only returns genders that
+// already have a matching product, which hid "Men" and "Boys" entirely
+// whenever the current category/filter happened to have none yet. The
+// person filtering wants the option to be there even to find out a
+// gender has zero results right now, not have it disappear.
+const GENDER_OPTIONS = ["WOMENS", "MENS", "GIRLS", "BOYS"];
+
 function imageSrc(p) {
   // Prefer the ORIGINAL remote image_url over the locally-downloaded
   // copy -- a local file only exists on whichever machine/container ran
@@ -21,7 +38,7 @@ function imageSrc(p) {
 
 export default function Products() {
   const [products, setProducts] = useState([]);
-  const [filters, setFilters] = useState({ source: "", category: "", brand: "" });
+  const [filters, setFilters] = useState({ source: "", category: "", brand: "", gender: "" });
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
   const cart = useCart();
@@ -41,6 +58,7 @@ export default function Products() {
     if (filters.source) params.set("source", filters.source);
     if (filters.category) params.set("category", filters.category);
     if (filters.brand) params.set("brand", filters.brand);
+    if (filters.gender) params.set("gender", filters.gender);
     fetch(`/api/products?${params.toString()}`)
       .then((r) => r.json())
       .then(setProducts);
@@ -89,6 +107,18 @@ export default function Products() {
             </option>
           ))}
         </select>
+        <select
+          value={filters.gender}
+          onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
+          className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+        >
+          <option value="">All Genders</option>
+          {GENDER_OPTIONS.map((g) => (
+            <option key={g} value={g}>
+              {GENDER_LABELS[g] || g}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -122,7 +152,7 @@ export default function Products() {
                 </div>
                 <div className="p-3">
                   <div className="text-xs text-neutral-500">
-                    {p.source} {p.brand ? `· ${p.brand}` : ""}
+                    {p.source} {p.brand ? `· ${p.brand}` : ""} {p.gender ? `· ${GENDER_LABELS[p.gender] || p.gender}` : ""}
                   </div>
                   <div className="text-sm font-medium truncate">{p.product_name}</div>
                   <div className="text-sm mt-1">

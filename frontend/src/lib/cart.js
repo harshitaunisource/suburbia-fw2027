@@ -31,25 +31,67 @@ export function useCart() {
   const toggle = useCallback(async (item) => {
     // item: { source_ref, product_name, category, description, image_path,
     //         colorways, fabric, size_range, target_price, currency, notes }
-    const res = await fetch("/api/catalogue/cart/toggle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item),
-    });
-    const data = await res.json();
+    //
+    // Flips the checkbox state immediately (optimistic update) instead of
+    // waiting on the round-trip to /cart/toggle -- previously the checkbox
+    // only visually changed once the fetch resolved, which reads as a
+    // multi-second lag on anything but a very fast connection. If the
+    // request turns out to fail, the optimistic flip is rolled back below.
+    const wasInCart = refs.has(item.source_ref);
     setRefs((prev) => {
       const next = new Set(prev);
-      if (data.in_cart === false) {
-        next.delete(item.source_ref);
-      } else {
-        next.add(item.source_ref);
-      }
+      if (wasInCart) next.delete(item.source_ref);
+      else next.add(item.source_ref);
       return next;
     });
-    return data;
-  }, []);
+
+    try {
+      const res = await fetch("/api/catalogue/cart/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to update cart");
+      // Reconcile with what the server actually did, in case it disagrees
+      // with our optimistic guess (e.g. two tabs toggling the same item).
+      setRefs((prev) => {
+        const next = new Set(prev);
+        if (data.in_cart === false) next.delete(item.source_ref);
+        else next.add(item.source_ref);
+        return next;
+      });
+      return data;
+    } catch (err) {
+      // Roll back the optimistic flip -- the server never actually
+      // recorded the change. Surfaced to the console (not just silently
+      // reverted) so a real failure here is visible instead of looking
+      // identical to "nothing happened."
+      console.error("Failed to update PPT cart for", item.source_ref, err);
+      setRefs((prev) => {
+        const next = new Set(prev);
+        if (wasInCart) next.add(item.source_ref);
+        else next.delete(item.source_ref);
+        return next;
+      });
+      throw err;
+    }
+  }, [refs]);
 
   return { refs, count: refs.size, loaded, isInCart, toggle, refresh };
+}
+
+/** Picks the best available image reference for a scraped product to
+ * carry into the cart/catalogue. Prefers the remote image_url over the
+ * locally-downloaded copy for the same reason Products.jsx's imageSrc()
+ * does (see that file): local_image_path only exists on whichever
+ * machine/container ran the scrape, which on a stateless deployment is
+ * almost never the one serving this request -- or the one generating the
+ * PPT later. Stored as-is (a full URL, or a legacy local path); whatever
+ * reads it back (OurProducts.jsx, the PPT generator) is responsible for
+ * telling the two apart. */
+function bestImageRef(p) {
+  return p.image_url || p.local_image_path || null;
 }
 
 /** Builds the payload toggle() needs from a classic Products-table row. */
@@ -59,7 +101,7 @@ export function cartItemFromProduct(p) {
     product_name: p.product_name,
     category: p.category || null,
     description: p.description || null,
-    image_path: p.local_image_path || null,
+    image_path: bestImageRef(p),
     colorways: p.colors || null,
     fabric: p.material || null,
     size_range: p.sizes || null,
@@ -77,7 +119,7 @@ export function cartItemFromGenericProduct(p) {
     product_name: p.product_name,
     category: p.category || null,
     description: p.description || null,
-    image_path: p.local_image_path || null,
+    image_path: bestImageRef(p),
     colorways: p.color || null,
     fabric: p.material || null,
     size_range: null,

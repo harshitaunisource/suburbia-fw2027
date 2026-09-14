@@ -84,6 +84,8 @@ class Gender(str, enum.Enum):
     WOMENS = "WOMENS"
     UNISEX = "UNISEX"
     KIDS = "KIDS"
+    GIRLS = "GIRLS"
+    BOYS = "BOYS"
 
 
 class Product(Base):

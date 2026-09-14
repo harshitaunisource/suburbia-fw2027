@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
-from app.routers import analytics, attributes, catalogue, dashboard, generic, opportunities, products, scrapers
+from app.routers import analytics, attributes, catalogue, generic, opportunities, products, scrapers
 from app.scrapers.base import STORAGE_ROOT
 
 app = FastAPI(title="Suburbia FW2027 Fashion Intelligence API")
@@ -30,7 +30,6 @@ def on_startup():
     (STORAGE_ROOT / "catalogue").mkdir(parents=True, exist_ok=True)
 
 
-app.include_router(dashboard.router)
 app.include_router(products.router)
 app.include_router(scrapers.router)
 app.include_router(attributes.router)

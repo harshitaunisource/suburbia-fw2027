@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import Product, ScrapeRun
 from app.scrapers.base import ScrapedProduct, ScraperError
 from app.scrapers.registry import get_scraper
+from app.services.gender_classify import classify_gender
 
 
 def _safe_commit(db: Session):
@@ -141,5 +142,11 @@ def _apply(product: Product, item: ScrapedProduct, local_image_path: str | None)
     product.sizes = ",".join(item.sizes) if item.sizes else None
     product.colors = ",".join(item.colors) if item.colors else None
     product.availability = item.availability
+    # This pipeline (the classic per-brand scrapers) never receives an
+    # explicit gender the way the "generic" scraping path does -- see
+    # gender_classify.py's docstring. Re-classify from the name every
+    # time (not just on first insert) so a re-scrape with an updated
+    # product_name can correct a prior misclassification.
+    product.gender = classify_gender(item.product_name, item.category, item.subcategory)
     product.scraped_at = datetime.utcnow()
     product.updated_at = datetime.utcnow()

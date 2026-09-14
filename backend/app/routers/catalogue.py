@@ -32,7 +32,16 @@ ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 @router.get("/products", response_model=list[CatalogueProductOut])
 def list_catalogue_products(approved: bool | None = None, db: Session = Depends(get_db)):
-    q = db.query(CatalogueProduct)
+    # Scoped to the current cart batch (source_ref IS NOT NULL) -- this is
+    # what the page itself calls "the current PPT batch", i.e. only what
+    # was selected via the "Add to PPT" checkboxes on Products / Search
+    # Products / Explore Categories. Without this filter, any row ever
+    # created some other way (e.g. the Buyer Opportunities "seed from
+    # competitor" fast path, which never set a source_ref) stayed
+    # approved=True forever and silently kept showing up here -- and in
+    # every future generated deck -- regardless of what was actually
+    # selected in the current session.
+    q = db.query(CatalogueProduct).filter(CatalogueProduct.source_ref.isnot(None))
     if approved is not None:
         q = q.filter(CatalogueProduct.approved.is_(approved))
     return q.order_by(CatalogueProduct.sort_order, CatalogueProduct.id).all()

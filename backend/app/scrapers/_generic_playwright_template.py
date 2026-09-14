@@ -151,6 +151,111 @@ def extract_jsonld_image(soup: BeautifulSoup) -> Optional[str]:
     return None
 
 
+# Class/id fragments that mark an <img> as very likely to BE the actual
+# product photo, vs. incidental page furniture (nav logos, trust badges,
+# payment icons, related-product carousels). Checked against the image's
+# own class/id AND its ancestor containers' class/id.
+_PRODUCT_IMAGE_HINTS = (
+    "product-image", "product-photo", "product-media", "product-gallery",
+    "productimage", "pdp-image", "pdp-gallery", "gallery-image",
+    "main-image", "hero-image", "primary-image", "zoom-image",
+)
+# Class/id fragments that rule an <img> OUT even if nothing else does --
+# these are never the product photo itself.
+_NON_PRODUCT_IMAGE_HINTS = (
+    "logo", "icon", "badge", "payment", "trust", "swatch", "thumbnail-nav",
+    "avatar", "rating", "star", "banner", "promo",
+)
+
+
+def _img_candidate_url(img_tag) -> Optional[str]:
+    """Pulls the most likely real image URL off a single <img> tag,
+    preferring lazy-load attributes (data-src, data-original, data-lazy)
+    over `src` -- many storefronts leave `src` pointing at a tiny
+    placeholder/blank-gif until JS swaps in the real URL on scroll, and a
+    server-rendered HTML snapshot can still show the placeholder in `src`
+    even once the lazy-load attribute already holds the real one."""
+    for attr in ("data-src", "data-original", "data-lazy", "data-lazy-src", "src"):
+        val = img_tag.get(attr)
+        if val and not val.startswith("data:"):
+            return val
+    srcset = img_tag.get("srcset") or img_tag.get("data-srcset")
+    if srcset:
+        # srcset is "url1 1x, url2 2x, ..." -- take the last (usually
+        # highest-resolution) candidate.
+        parts = [p.strip().split(" ")[0] for p in srcset.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
+    return None
+
+
+def extract_fallback_img_tag_image(soup: BeautifulSoup, base_url: str) -> Optional[str]:
+    """Last-resort image extraction for pages where neither og:image nor
+    JSON-LD gave anything usable (confirmed on Primark: og:image itself
+    is the site's own "no image available" graphic, and there's no
+    product JSON-LD on the page at all). Scans real <img> tags instead,
+    scored by how likely each one is to actually be the product photo.
+
+    This is inherently a heuristic (unlike the two layers above, which
+    are either fully deterministic or a confirmed, tested domain-specific
+    rule) -- it's only reached when both of those have already failed,
+    and is meant to catch real product photography that a page simply
+    doesn't expose through the "normal" channels, not to be authoritative.
+    """
+    from urllib.parse import urljoin
+
+    best_url = None
+    best_score = -1
+    for img in soup.find_all("img"):
+        candidate = _img_candidate_url(img)
+        if not candidate:
+            continue
+        if any(marker in candidate.lower() for marker in PLACEHOLDER_IMAGE_MARKERS):
+            continue
+
+        haystack = " ".join([
+            img.get("class") and " ".join(img.get("class")) or "",
+            img.get("id") or "",
+            img.get("alt") or "",
+        ]).lower()
+        # Also check up to 3 ancestor containers -- product photos are
+        # very often wrapped in a "product-gallery"/"pdp-media" div even
+        # when the <img> tag itself has no useful class of its own.
+        parent = img.parent
+        for _ in range(3):
+            if parent is None:
+                break
+            haystack += " " + " ".join([
+                parent.get("class") and " ".join(parent.get("class")) or "",
+                parent.get("id") or "",
+            ]).lower()
+            parent = parent.parent
+
+        if any(bad in haystack for bad in _NON_PRODUCT_IMAGE_HINTS):
+            continue
+
+        score = 1 if any(good in haystack for good in _PRODUCT_IMAGE_HINTS) else 0
+        # Prefer images with plausible width/height attributes over tiny
+        # icons that slipped past the class-name filters.
+        try:
+            w = int(img.get("width") or 0)
+            h = int(img.get("height") or 0)
+            if w and h and min(w, h) < 80:
+                continue
+            if w and h and min(w, h) >= 300:
+                score += 1
+        except (TypeError, ValueError):
+            pass
+
+        if score > best_score:
+            best_score = score
+            best_url = candidate
+
+    if not best_url:
+        return None
+    return urljoin(base_url, best_url)
+
+
 def clean_title(title: Optional[str], separators: tuple[str, ...] = ("|", " - ")) -> Optional[str]:
     if not title:
         return None
@@ -269,6 +374,25 @@ def parse_generic_product(
         jsonld_image = extract_jsonld_image(soup)
         if jsonld_image:
             main_image = jsonld_image
+        else:
+            fallback_image = extract_fallback_img_tag_image(soup, url)
+            if fallback_image:
+                main_image = fallback_image
+            else:
+                # Confirmed live bug: if og:image itself IS the placeholder
+                # (e.g. Primark's PDP consistently returns
+                # ".../assets/images/no-image.png" in its og:image meta) and
+                # neither JSON-LD nor a scan of the page's own <img> tags
+                # turns up anything usable either, main_image previously
+                # kept the placeholder value instead of being cleared --
+                # every affected product then stored a "real" image_url
+                # that's actually just the site's own blank/no-photo
+                # graphic, which renders as a loadable but empty-looking
+                # image everywhere downstream (Products page, PPT) instead
+                # of the honest "No image" state. Null it out so those
+                # paths fall back correctly instead of silently displaying
+                # a placeholder as if it were product photography.
+                main_image = None
 
     if description is None and not (override and override.get("skip_description")):
         description = meta_content(soup, "og:description")

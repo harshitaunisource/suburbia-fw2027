@@ -71,7 +71,12 @@ class PrimarkScraper(PlaywrightScraper):
         return products
 
     def scrape_product(self, url: str, category_hint: Optional[str] = None) -> ScrapedProduct:
-        html = self.get_rendered_html(url, wait_selector="h1", wait_ms=1500)
+        # scroll=True (matching scrape_category above) so any lazy-loaded
+        # main product image actually swaps in before the HTML is
+        # captured -- Primark's PDP og:image consistently points at the
+        # site's own "no image available" placeholder, and the real photo
+        # img tag doesn't appear to populate until the page is scrolled.
+        html = self.get_rendered_html(url, wait_selector="h1", wait_ms=2500, scroll=True)
         return parse_generic_product(
             html, url, self.source_name, brand="Primark", category_hint=category_hint, currency="GBP"
         )

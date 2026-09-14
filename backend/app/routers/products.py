@@ -14,6 +14,7 @@ def list_products(
     brand: str | None = None,
     category: str | None = None,
     source: str | None = None,
+    gender: str | None = None,
     price_min: float | None = None,
     price_max: float | None = None,
     limit: int = Query(50, le=200),
@@ -26,6 +27,8 @@ def list_products(
         q = q.filter(Product.category == category)
     if source:
         q = q.filter(Product.source == source)
+    if gender:
+        q = q.filter(Product.gender == gender)
     if price_min is not None:
         q = q.filter(Product.price >= price_min)
     if price_max is not None:
@@ -60,6 +63,21 @@ def list_sources(category: str | None = None, db: Session = Depends(get_db)):
     if category:
         q = q.filter(Product.category == category)
     return sorted(r[0] for r in q.all())
+
+
+@router.get("/meta/genders")
+def list_genders(category: str | None = None, source: str | None = None, db: Session = Depends(get_db)):
+    """Every distinct gender that has at least one scraped product,
+    optionally narrowed to one category/source -- powers the Gender
+    filter dropdown on the Products page. Only offers options that
+    actually exist so the dropdown doesn't show e.g. "Boys" when
+    nothing scraped so far has been classified as boys' wear."""
+    q = db.query(Product.gender).filter(Product.gender.isnot(None)).distinct()
+    if category:
+        q = q.filter(Product.category == category)
+    if source:
+        q = q.filter(Product.source == source)
+    return sorted(r[0].value if hasattr(r[0], "value") else r[0] for r in q.all())
 
 
 @router.get("/{product_id}", response_model=ProductOut)

@@ -5,7 +5,10 @@ __pycache__/
 node_modules/
 dist/
 *.db
-backend/storage/products/*/*.jpg
-backend/storage/products/*/*.png
+backend/storage/products/**/*.jpg
+backend/storage/products/**/*.jpeg
+backend/storage/products/**/*.png
+backend/storage/products/**/*.webp
 backend/storage/catalogue/*.pdf
+backend/storage/catalogue/*.pptx
 .env

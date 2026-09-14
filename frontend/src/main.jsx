@@ -1,8 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, NavLink } from "react-router-dom";
 import "./index.css";
-import Dashboard from "./pages/Dashboard";
 import DataCollection from "./pages/DataCollection";
 import Products from "./pages/Products";
 import SearchProducts from "./pages/SearchProducts";
@@ -13,16 +12,13 @@ import Catalogue from "./pages/Catalogue";
 import ExploreCategories from "./pages/ExploreCategories";
 import BrandSetup from "./pages/BrandSetup";
 import AddBrand from "./pages/AddBrand";
-import ImportSpreadsheet from "./pages/ImportSpreadsheet";
 
 const NAV = [
-  { to: "/", label: "Dashboard", end: true },
   { to: "/brand-setup", label: "Brand Setup" },
   { to: "/add-brand", label: "Add Brand" },
   { to: "/data-collection", label: "Data Collection" },
-  { to: "/products", label: "Products" },
+  { to: "/products", label: "Products", end: true },
   { to: "/search-products", label: "Search Products" },
-  { to: "/import-spreadsheet", label: "Import Spreadsheet" },
   { to: "/analytics", label: "Market Analytics" },
   { to: "/opportunities", label: "Buyer Opportunities" },
   { to: "/our-products", label: "Our Products" },
@@ -57,13 +53,12 @@ function Shell() {
         </aside>
         <main className="flex-1 p-8">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Navigate to="/products" replace />} />
             <Route path="/brand-setup" element={<BrandSetup />} />
             <Route path="/add-brand" element={<AddBrand />} />
             <Route path="/data-collection" element={<DataCollection />} />
             <Route path="/products" element={<Products />} />
             <Route path="/search-products" element={<SearchProducts />} />
-            <Route path="/import-spreadsheet" element={<ImportSpreadsheet />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/opportunities" element={<BuyerOpportunities />} />
             <Route path="/our-products" element={<OurProducts />} />

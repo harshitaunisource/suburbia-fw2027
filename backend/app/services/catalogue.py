@@ -31,10 +31,12 @@ CatalogueProduct row explicitly carries.
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import date
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
@@ -61,6 +63,10 @@ IMAGE_HEIGHT = Inches(5.2)
 LEFT_MARGIN = Inches(0.5)
 TOP_MARGIN = Inches(0.6)
 
+# Deck prices are shown at 1/6th of the real stored price (requested
+# explicitly) -- see _format_price below.
+PPT_PRICE_DISPLAY_FACTOR = 6
+
 
 def _blank_slide(prs: Presentation):
     return prs.slides.add_slide(prs.slide_layouts[6])
@@ -80,9 +86,7 @@ def _add_text(slide, left, top, width, height, text, size=14, bold=False, color=
     return box
 
 
-def _resolve_image_path(path: Optional[str]) -> Optional[Path]:
-    if not path:
-        return None
+def _resolve_local_image_path(path: str) -> Optional[Path]:
     # Normalize backslashes to forward slashes BEFORE constructing a
     # Path: this service runs on Railway (Linux), and Python's pathlib
     # does not cross-translate Windows-style separators.
@@ -93,17 +97,62 @@ def _resolve_image_path(path: Optional[str]) -> Optional[Path]:
     return p if p.exists() else None
 
 
+def _resolve_image_file(path: Optional[str], tmp_files: list) -> Optional[Path]:
+    """Returns a local file path python-pptx can actually embed,
+    downloading a remote image on the fly when needed.
+
+    Most CatalogueProduct rows carry a remote CDN image_url (the
+    competitor's own hosted photo), not anything saved to this
+    container's disk -- see cartItemFromProduct/cartItemFromGenericProduct
+    in the frontend, which now store image_url ahead of any locally
+    downloaded copy for exactly this reason (a locally-downloaded file
+    only exists on whichever machine ran the scrape, which is almost
+    never the one generating this deck). python-pptx's add_picture()
+    only accepts a local path or file-like object, so a remote URL has
+    to be fetched into a temp file first. Any temp file created is
+    appended to tmp_files so the caller can clean it up once the deck
+    has been saved.
+    """
+    if not path:
+        return None
+    if path.startswith("http://") or path.startswith("https://"):
+        try:
+            resp = httpx.get(path, timeout=10.0, follow_redirects=True)
+            resp.raise_for_status()
+        except Exception:
+            # Same "fail quiet, fall back to placeholder" behavior as a
+            # missing local file below -- one bad/expired image URL
+            # shouldn't abort the whole deck.
+            return None
+        suffix = Path(path.split("?")[0]).suffix or ".jpg"
+        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        try:
+            tmp.write(resp.content)
+        finally:
+            tmp.close()
+        tmp_path = Path(tmp.name)
+        tmp_files.append(tmp_path)
+        return tmp_path
+    return _resolve_local_image_path(path)
+
+
 def _format_price(product: CatalogueProduct) -> Optional[str]:
     if not product.target_price:
         return None
     currency = product.currency or "USD"
-    return f"Target Price: {currency} {product.target_price:,.2f}"
+    # Deck prices are shown at 1/6th of the actual stored target_price --
+    # display-only, requested explicitly so the buyer-facing deck never
+    # reflects the real internal price. The stored CatalogueProduct row
+    # (and everywhere else in the app) still holds and shows the real
+    # figure; only this rendered line in the generated .pptx is scaled.
+    display_price = product.target_price / PPT_PRICE_DISPLAY_FACTOR
+    return f"Price: {currency} {display_price:,.2f}"
 
 
-def _draw_product_column(slide, product: CatalogueProduct, col_index: int):
+def _draw_product_column(slide, product: CatalogueProduct, col_index: int, tmp_files: list):
     left = LEFT_MARGIN + col_index * (COLUMN_WIDTH + COLUMN_GAP)
 
-    img_path = _resolve_image_path(product.image_path)
+    img_path = _resolve_image_file(product.image_path, tmp_files)
     if img_path:
         slide.shapes.add_picture(str(img_path), left, TOP_MARGIN, width=COLUMN_WIDTH, height=IMAGE_HEIGHT)
     else:
@@ -163,9 +212,22 @@ def generate_catalogue_pptx(
     products = (
         db.query(CatalogueProduct)
         .filter(CatalogueProduct.approved.is_(True))
+        # Only the current cart batch (source_ref IS NOT NULL) -- see the
+        # matching comment on list_catalogue_products in
+        # routers/catalogue.py for why this matters: without it, any
+        # approved=True row from ANY origin (not just the checkboxes on
+        # Products/Search Products/Explore Categories) got pulled into
+        # every generated deck forever, regardless of what was actually
+        # selected for this batch.
+        .filter(CatalogueProduct.source_ref.isnot(None))
         .order_by(CatalogueProduct.sort_order, CatalogueProduct.id)
         .all()
     )
+
+    # Any remote image_url gets downloaded into a temp file so python-pptx
+    # can embed it (see _resolve_image_file) -- tracked here so every temp
+    # file is cleaned up once the deck is saved, success or failure.
+    tmp_files: list = []
 
     prs = Presentation()
     prs.slide_width = SLIDE_W
@@ -204,7 +266,7 @@ def generate_catalogue_pptx(
         chunk = products[i:i + PRODUCTS_PER_SLIDE]
         slide = _blank_slide(prs)
         for col_index, product in enumerate(chunk):
-            _draw_product_column(slide, product, col_index)
+            _draw_product_column(slide, product, col_index, tmp_files)
 
     # ------------------------------------------------------------------ final
     slide = _blank_slide(prs)
@@ -212,5 +274,13 @@ def generate_catalogue_pptx(
     steps = ["Sample Selection", "Commercial Discussion", "Style Confirmation", "Order Placement"]
     _add_text(slide, Inches(1), Inches(3.5), Inches(11), Inches(2.5), "  →  ".join(steps), size=18)
 
-    prs.save(str(filepath))
+    try:
+        prs.save(str(filepath))
+    finally:
+        for tmp_path in tmp_files:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
     return str(filepath)

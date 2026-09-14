@@ -21,9 +21,6 @@ const SCRAPER_CATEGORIES = [
   { source: "primark", label: "Primark (US) — Sweaters & Cardigans", category: "sweaters", url: "https://www.primark.com/en-us/c/women/clothing/sweaters-and-cardigans", verified: true },
   { source: "primark", label: "Primark (UK) — Blouses", category: "blouses", url: "https://www.primark.com/en-gb/c/women/clothing/shirts-and-blouses/blouses", verified: true },
 
-  { source: "target", label: "Target — Sweaters", category: "sweaters", url: "https://www.target.com/c/sweaters-women-s-clothing/-/N-5xtbx", verified: true },
-  { source: "target", label: "Target — Shirts & Blouses", category: "blouses", url: "https://www.target.com/c/shirts-blouses-women-s-clothing/-/N-m7sh2", verified: true },
-
   { source: "old_navy", label: "Old Navy (Gap) — Sweaters & Cardigans", category: "sweaters", url: "https://oldnavy.gap.com/browse/women/sweaters-and-cardigans?cid=20408#department=136", verified: true },
   { source: "old_navy", label: "Old Navy (Gap) — Blouses", category: "blouses", url: "https://oldnavy.gap.com/shop/womens-fashion-blouses-0aaz22b", verified: true },
 

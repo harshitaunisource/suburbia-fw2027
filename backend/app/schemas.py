@@ -24,6 +24,7 @@ class ProductOut(BaseModel):
     original_price: Optional[float]
     discount_percentage: Optional[float]
     availability: Optional[str]
+    gender: Optional[str] = None
     scraped_at: Optional[datetime]
 
     @computed_field
@@ -63,14 +64,6 @@ class RunScrapeRequest(BaseModel):
     category_url: str
     max_pages: Optional[int] = None
 
-
-class DashboardStats(BaseModel):
-    products_analysed: int
-    images_collected: int
-    ai_classified: int
-    opportunities: int
-    shortlisted_styles: int
-    catalogue_styles: int
 
 class RunAttributeExtractionRequest(BaseModel):
     category: Optional[str] = None

@@ -2,9 +2,17 @@ import { useEffect, useState } from "react";
 
 function imageSrc(imagePath) {
   if (!imagePath) return null;
-  // Normalize backslashes first -- see Products.jsx's imageSrc for why
-  // (rows scraped on Windows before a since-fixed backend bug store
-  // "storage\products\..." instead of "storage/products/...").
+  // Most catalogue entries now carry a full remote image_url (see
+  // cartItemFromProduct in lib/cart.js) -- use it directly rather than
+  // trying to treat it as a local storage path.
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+  // Legacy / locally-uploaded ("Our Products" photo upload) rows still
+  // store a local storage path. Normalize backslashes first -- see
+  // Products.jsx's imageSrc for why (rows scraped on Windows before a
+  // since-fixed backend bug store "storage\products\..." instead of
+  // "storage/products/...").
   const normalized = imagePath.replace(/\\/g, "/");
   const idx = normalized.indexOf("storage/");
   return "/" + (idx >= 0 ? normalized.slice(idx) : normalized);
@@ -94,9 +102,18 @@ export default function OurProducts() {
       </div>
 
       {result?.ok && (
-        <div className="mb-6 text-sm text-green-700 bg-green-50 rounded-md p-3">
-          ✓ Generated {result.filename}. This batch has been cleared — pick your next set of products
-          whenever you're ready.
+        <div className="mb-6 text-sm text-green-700 bg-green-50 rounded-md p-3 flex items-center justify-between gap-3">
+          <span>
+            ✓ Generated {result.filename}. This batch has been cleared — pick your next set of products
+            whenever you're ready.
+          </span>
+          <a
+            href={`/api/catalogue/download/${encodeURIComponent(result.filename)}`}
+            download={result.filename}
+            className="shrink-0 px-3 py-1.5 rounded-md bg-green-700 text-white text-xs font-medium hover:bg-green-800"
+          >
+            Download PPT
+          </a>
         </div>
       )}
       {result?.ok === false && (

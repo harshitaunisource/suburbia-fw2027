@@ -5,7 +5,6 @@ from app.scrapers.old_navy import OldNavyScraper
 from app.scrapers.c_and_a import CAndAScraper
 from app.scrapers.zara import ZaraScraper
 from app.scrapers.primark import PrimarkScraper
-from app.scrapers.target import TargetScraper
 from app.scrapers.shein import SheinScraper
 from app.scrapers.boohoo import BoohooScraper
 from app.scrapers.asos import AsosScraper
@@ -14,14 +13,22 @@ from app.scrapers.lupo import LupoScraper
 from app.scrapers.women_secret import WomenSecretScraper
 from app.scrapers.lili_pink import LiliPinkScraper
 
-# All 10 sources from the spec are now registered. Confidence level varies
+# All sources from the spec are now registered. Confidence level varies
 # a lot by source -- see each module's docstring:
 #   HIGH  (live-verified end to end): suburbia, old_navy
 #   MEDIUM (live-verified with real data, some fields incomplete): c_and_a, asos
 #   MEDIUM (architecture solid, built on real captured samples, not
 #           re-verified after latest fix): hm, zara
 #   LOW / UNVERIFIED (built defensively, needs a first real smoke test
-#           before you trust the numbers): target, shein, boohoo, primark
+#           before you trust the numbers): shein, boohoo, primark
+#
+# "target" was removed (2026-09-14): its category URLs did not resolve
+# to the intended women's sweaters/blouses pages, and the only two rows
+# it ever produced were unrelated outdoor-furniture listings scraped
+# off the wrong category page. Rather than keep an unverified source
+# generating wrong data, it's been dropped entirely -- see
+# scripts/delete_brand_products.py for how any leftover rows can be
+# purged from an existing database.
 #
 # Every scraper here fails LOUD (raises ScraperError, reported in
 # scrape_runs.error_message) instead of returning fabricated data -- a
@@ -34,7 +41,6 @@ SCRAPERS: dict[str, type] = {
     "zara": ZaraScraper,
     "c_and_a": CAndAScraper,
     "primark": PrimarkScraper,
-    "target": TargetScraper,
     "old_navy": OldNavyScraper,
     "shein": SheinScraper,
     "boohoo": BoohooScraper,
