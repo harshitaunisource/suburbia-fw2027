@@ -14,6 +14,7 @@ def list_products(
     brand: str | None = None,
     category: str | None = None,
     source: str | None = None,
+    sources: str | None = None,  # comma-separated -- lets the Products page show "suburbia,asos,c_and_a" etc. in one call
     gender: str | None = None,
     price_min: float | None = None,
     price_max: float | None = None,
@@ -25,7 +26,11 @@ def list_products(
         q = q.filter(Product.brand == brand)
     if category:
         q = q.filter(Product.category == category)
-    if source:
+    if sources:
+        source_list = [s.strip() for s in sources.split(",") if s.strip()]
+        if source_list:
+            q = q.filter(Product.source.in_(source_list))
+    elif source:
         q = q.filter(Product.source == source)
     if gender:
         q = q.filter(Product.gender == gender)

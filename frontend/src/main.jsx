@@ -12,6 +12,7 @@ import Catalogue from "./pages/Catalogue";
 import ExploreCategories from "./pages/ExploreCategories";
 import BrandSetup from "./pages/BrandSetup";
 import AddBrand from "./pages/AddBrand";
+import TrendMatching from "./pages/TrendMatching";
 
 const NAV = [
   { to: "/brand-setup", label: "Brand Setup" },
@@ -24,6 +25,7 @@ const NAV = [
   { to: "/our-products", label: "Our Products" },
   { to: "/catalogue", label: "Generate Catalogue" },
   { to: "/explore-categories", label: "Explore Categories" },
+  { to: "/trend-matching", label: "Trend Matching" },
 ];
 
 function Shell() {
@@ -64,6 +66,7 @@ function Shell() {
             <Route path="/our-products" element={<OurProducts />} />
             <Route path="/catalogue" element={<Catalogue />} />
             <Route path="/explore-categories" element={<ExploreCategories />} />
+            <Route path="/trend-matching" element={<TrendMatching />} />
           </Routes>
         </main>
       </div>

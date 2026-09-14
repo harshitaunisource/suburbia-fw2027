@@ -16,6 +16,8 @@ python-pptx==1.0.2
 openpyxl==3.1.5
 openai
 python-multipart
+pymupdf==1.24.11  # PDF image extraction for the Trend Matching feature (deck_extract.py)
+tavily-python==0.5.0  # web image search for the Trend Matching feature (image_search/tavily_provider.py)
 
 
 # IMPORTANT: this project needs Python 3.12 (or 3.11) -- NOT 3.13/3.14.

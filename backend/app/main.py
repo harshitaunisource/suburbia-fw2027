@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
-from app.routers import analytics, attributes, catalogue, generic, opportunities, products, scrapers
+from app.routers import analytics, attributes, catalogue, generic, opportunities, products, scrapers, trends
 from app.scrapers.base import STORAGE_ROOT
 
 app = FastAPI(title="Suburbia FW2027 Fashion Intelligence API")
@@ -37,6 +37,7 @@ app.include_router(analytics.router)
 app.include_router(opportunities.router)
 app.include_router(catalogue.router)
 app.include_router(generic.router)
+app.include_router(trends.router)
 
 # Serves downloaded product/catalogue images directly, e.g.
 # GET /storage/products/suburbia/sweaters/SB123.jpg -- so the frontend

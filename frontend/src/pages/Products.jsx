@@ -19,6 +19,12 @@ const GENDER_LABELS = {
 // gender has zero results right now, not have it disappear.
 const GENDER_OPTIONS = ["WOMENS", "MENS", "GIRLS", "BOYS"];
 
+// The buyer this whole app is built around -- always shown, never a
+// checkbox the person can turn off. Everything else scraped ("asos",
+// "c_and_a", "primark", ...) is a competitor and starts unchecked; the
+// person opts in to whichever competitors they want to compare against.
+const BUYER_SOURCE = "suburbia";
+
 function imageSrc(p) {
   // Prefer the ORIGINAL remote image_url over the locally-downloaded
   // copy -- a local file only exists on whichever machine/container ran
@@ -38,9 +44,10 @@ function imageSrc(p) {
 
 export default function Products() {
   const [products, setProducts] = useState([]);
-  const [filters, setFilters] = useState({ source: "", category: "", brand: "", gender: "" });
+  const [filters, setFilters] = useState({ category: "", brand: "", gender: "" });
   const [categories, setCategories] = useState([]);
-  const [sources, setSources] = useState([]);
+  const [allSources, setAllSources] = useState([]);
+  const [selectedCompetitors, setSelectedCompetitors] = useState([]); // never includes BUYER_SOURCE -- that's always on
   const cart = useCart();
 
   useEffect(() => {
@@ -50,19 +57,19 @@ export default function Products() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (filters.category) params.set("category", filters.category);
-    fetch(`/api/products/meta/sources?${params.toString()}`).then((r) => r.json()).then(setSources);
+    fetch(`/api/products/meta/sources?${params.toString()}`).then((r) => r.json()).then(setAllSources);
   }, [filters.category]);
 
   useEffect(() => {
-    const params = new URLSearchParams({ limit: "100" });
-    if (filters.source) params.set("source", filters.source);
+    const activeSources = [BUYER_SOURCE, ...selectedCompetitors];
+    const params = new URLSearchParams({ limit: "100", sources: activeSources.join(",") });
     if (filters.category) params.set("category", filters.category);
     if (filters.brand) params.set("brand", filters.brand);
     if (filters.gender) params.set("gender", filters.gender);
     fetch(`/api/products?${params.toString()}`)
       .then((r) => r.json())
       .then(setProducts);
-  }, [filters]);
+  }, [filters, selectedCompetitors]);
 
   async function generatePPT() {
     const res = await fetch("/api/catalogue/generate", {
@@ -76,49 +83,68 @@ export default function Products() {
     return data;
   }
 
+  const competitorSources = allSources.filter((s) => s !== BUYER_SOURCE);
+
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-6">Products</h1>
 
       <CartBar count={cart.count} onGenerate={generatePPT} />
 
-      <div className="flex gap-3 mb-6">
-        <select
-          value={filters.category}
-          onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-          className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.source}
-          onChange={(e) => setFilters({ ...filters, source: e.target.value })}
-          className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
-        >
-          <option value="">All Sources</option>
-          {sources.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.gender}
-          onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
-          className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
-        >
-          <option value="">All Genders</option>
-          {GENDER_OPTIONS.map((g) => (
-            <option key={g} value={g}>
-              {GENDER_LABELS[g] || g}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-wrap items-end gap-3 mb-6">
+        <div>
+          <label className="block text-xs text-neutral-500 mb-1">Category</label>
+          <select
+            value={filters.category}
+            onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+            className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-neutral-500 mb-1">Gender</label>
+          <select
+            value={filters.gender}
+            onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
+            className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+          >
+            <option value="">All Genders</option>
+            {GENDER_OPTIONS.map((g) => (
+              <option key={g} value={g}>
+                {GENDER_LABELS[g] || g}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-neutral-500 mb-1">
+            Competitors (Suburbia always shown -- hold Ctrl/Cmd to pick more than one)
+          </label>
+          <select
+            multiple
+            value={selectedCompetitors}
+            onChange={(e) =>
+              setSelectedCompetitors(Array.from(e.target.selectedOptions, (opt) => opt.value))
+            }
+            className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white min-w-[200px]"
+            size={Math.min(6, Math.max(3, competitorSources.length))}
+          >
+            {competitorSources.length === 0 && (
+              <option disabled>No competitors scraped yet</option>
+            )}
+            {competitorSources.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -126,6 +152,7 @@ export default function Products() {
           const src = imageSrc(p);
           const item = cartItemFromProduct(p);
           const checked = cart.isInCart(item.source_ref);
+          const isBuyer = p.source === BUYER_SOURCE;
           return (
             <div
               key={p.id}
@@ -142,6 +169,11 @@ export default function Products() {
                 />
                 PPT
               </label>
+              {isBuyer && (
+                <span className="absolute top-2 right-2 z-10 text-[9px] bg-neutral-900 text-white px-1.5 py-0.5 rounded-full">
+                  Buyer
+                </span>
+              )}
               <a href={p.product_url} target="_blank" rel="noreferrer">
                 <div className="aspect-square bg-neutral-100 flex items-center justify-center overflow-hidden">
                   {src ? (

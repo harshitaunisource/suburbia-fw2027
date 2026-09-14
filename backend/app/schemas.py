@@ -186,3 +186,57 @@ class GenerateCatalogueRequest(BaseModel):
     # by one. Defaults on; pass false to keep the batch around (e.g. to
     # regenerate the same deck again without re-selecting anything).
     clear_after: bool = True
+
+
+# ---------------------------------------------------------------- trends
+
+class TrendUploadOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    filename: str
+    buyer_label: Optional[str]
+    status: str
+    error_message: Optional[str]
+    total_products: int = 0
+    products_classified: int = 0
+    created_at: datetime
+
+
+class TrendProductOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    upload_id: int
+    image_path: str
+    slide_number: Optional[int]
+    ai_name: Optional[str]
+    ai_category: Optional[str]
+    ai_color: Optional[str]
+    ai_pattern: Optional[str]
+    ai_description: Optional[str]
+    ai_confidence: Optional[float]
+
+
+class TrendMatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    trend_product_id: int
+    source_type: str
+    catalogue_product_id: Optional[int]
+    web_image_url: Optional[str]
+    web_title: Optional[str]
+    web_source_url: Optional[str]
+    score: Optional[float]
+
+    # Populated by the router (not a real column) so the frontend can
+    # render a match card without a second lookup per match.
+    display_image_url: Optional[str] = None
+    display_name: Optional[str] = None
+    display_source_url: Optional[str] = None  # the product page / web page this match links to
+
+
+class TrendProductWithMatchesOut(BaseModel):
+    product: TrendProductOut
+    matches: list[TrendMatchOut]

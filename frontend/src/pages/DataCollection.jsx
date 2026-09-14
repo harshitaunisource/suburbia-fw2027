@@ -32,9 +32,6 @@ const SCRAPER_CATEGORIES = [
 
   { source: "asos", label: "ASOS — Jumpers & Cardigans", category: "sweaters", url: "https://www.asos.com/us/women/jumpers-cardigans/cat/?cid=2637", verified: true },
   { source: "asos", label: "ASOS — Shirts & Blouses", category: "blouses", url: "https://www.asos.com/us/women/shirts-blouses/cat/?cid=15200", verified: true },
-
-  { source: "textilon", label: "Textilon — Women's Pajamas", category: "pajamas", url: "https://bo.textilon.com/articulos/categoria/mujer/subcategoria/pijamas", verified: true },
-  { source: "textilon", label: "Textilon — Men's Pajamas", category: "pajamas", url: "https://bo.textilon.com/articulos/categoria/hombre/subcategoria/pijamas", verified: true },
 ];
 
 export default function DataCollection() {

@@ -137,6 +137,24 @@ class CAndAScraper(BaseScraper):
             raise ScraperError(f"Could not find product name for {url}")
         name = re.sub(r"\s*\|\s*C&A M[eé]xico.*$", "", name).strip()
 
+        # Confirmed live contamination source: C&A's "Te podría gustar"
+        # recommendation widget leaks unrelated products into a category
+        # scrape (see this file's module docstring), and every Data
+        # Collection entry for C&A points at a "mujer" (women's) URL
+        # only -- so a men's product showing up here is never a real
+        # result for the configured category, it's always contamination.
+        # The breadcrumb (already parsed below for category) is the most
+        # reliable signal: reject outright rather than silently mislabel.
+        breadcrumb_text = " ".join(
+            a.get_text(" ", strip=True).lower() for a in soup.select("a[href]")
+        )
+        if "hombre" in breadcrumb_text and "mujer" not in breadcrumb_text:
+            raise ScraperError(
+                f"'{name}' is a men's product (breadcrumb says 'hombre') -- this link almost "
+                f"certainly came from the 'Te podría gustar' cross-sell widget, not the actual "
+                f"women's product grid. Skipping: {url}"
+            )
+
         main_image = self._meta_content(soup, "og:image")
 
         code_match = re.search(r"/(\d{5,8})\.html$", url)

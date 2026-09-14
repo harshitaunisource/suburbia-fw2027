@@ -264,6 +264,93 @@ class Buyer(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class TrendMatchSourceType(str, enum.Enum):
+    CATALOGUE = "CATALOGUE"  # matched against your own already-scraped competitor data (Products page)
+    WEB = "WEB"                # matched from a live web image search
+
+
+class TrendUpload(Base):
+    """One uploaded buyer trend deck (.pptx or .pdf). Each embedded image
+    in the file becomes a TrendProduct row once classified -- see
+    app/services/deck_extract.py for extraction and
+    app/services/vision_classify.py for classification.
+
+    Classification runs as a FastAPI BackgroundTask (see
+    routers/trends.py), not inline in the upload request -- a large deck
+    can take minutes of real AI vision calls, and holding one HTTP
+    request (and the one database connection tied to it) open for that
+    whole time is exactly what caused a live, confirmed failure: a Neon
+    Postgres connection sitting open-but-idle through a long classify
+    loop got dropped by the server ("SSL connection has been closed
+    unexpectedly") before the single big commit at the end. The upload
+    endpoint now returns immediately after saving the raw images, and
+    the background task classifies + commits ONE image at a time,
+    updating total_products/products_classified as it goes -- see
+    run_generic_scrape_background in services/generic_scraper.py for the
+    identical pattern already established elsewhere in this app, for
+    exactly the same "long-running work can't happen inside one HTTP
+    request" reason.
+    """
+    __tablename__ = "trend_uploads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    buyer_label = Column(String(160))  # free-text buyer/season label, display only
+    status = Column(String(20), nullable=False, default="processing")  # processing | ready | failed
+    error_message = Column(Text)
+    # Live progress, updated DURING classification so the frontend's
+    # polling loop can show "X / Y classified" instead of one static
+    # "please wait" message.
+    total_products = Column(Integer, default=0)
+    products_classified = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TrendProduct(Base):
+    """One extracted-and-classified image from a TrendUpload -- one
+    "buyer trend product" a merchant needs to find a match for."""
+    __tablename__ = "trend_products"
+
+    id = Column(Integer, primary_key=True, index=True)
+    upload_id = Column(Integer, ForeignKey("trend_uploads.id"), nullable=False, index=True)
+    image_path = Column(Text, nullable=False)  # local storage path, extracted from the deck
+    slide_number = Column(Integer)
+    ai_name = Column(String(255))          # e.g. "Blue striped women's blouse, loose fit"
+    ai_category = Column(String(80))
+    ai_color = Column(String(80))
+    ai_pattern = Column(String(80))
+    ai_description = Column(Text)
+    ai_confidence = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TrendMatch(Base):
+    """One candidate match found for a TrendProduct -- either an existing
+    scraped competitor Product (Asos/C&A/Primark/etc, from the same
+    `products` table the Products page reads from) or a live web image
+    search hit. Nothing here means "selected"; that's tracked separately
+    by a CatalogueProduct cart row (source_ref=f"trend_match:{match.id}")
+    once the merchant actually picks it, reusing the exact same "Add to
+    PPT" / generate pipeline every other page on this app already uses
+    -- see routers/trends.py:select_match."""
+    __tablename__ = "trend_matches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    trend_product_id = Column(Integer, ForeignKey("trend_products.id"), nullable=False, index=True)
+    source_type = Column(Enum(TrendMatchSourceType), nullable=False)
+
+    # Populated when source_type == CATALOGUE
+    catalogue_product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+
+    # Populated when source_type == WEB
+    web_image_url = Column(Text)
+    web_title = Column(String(255))
+    web_source_url = Column(Text)
+
+    score = Column(Float)  # 0-1, higher = more similar; see trend_matching.py
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class GenericSourceConfig(Base):
     """A (brand, category URL, gender, link-discovery override) entry
     for one sub-category. `pdp_link_pattern` is now an OPTIONAL manual

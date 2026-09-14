@@ -15,6 +15,13 @@ function imageSrc(p) {
   return null;
 }
 
+// The buyer this whole app is built around -- always the sensible
+// default when it exists for the current category. Previously this
+// defaulted to whichever source was alphabetically first ("asos" sorts
+// before "suburbia"), which silently overrode the backend's own correct
+// our_source="suburbia" default with the wrong value on every request.
+const BUYER_SOURCE = "suburbia";
+
 export default function BuyerOpportunities() {
   const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState("");
@@ -50,7 +57,10 @@ export default function BuyerOpportunities() {
       .then((r) => r.json())
       .then((list) => {
         setSources(list);
-        setBuyer((prev) => (list.includes(prev) ? prev : list[0] || ""));
+        setBuyer((prev) => {
+          if (list.includes(prev)) return prev;
+          return list.includes(BUYER_SOURCE) ? BUYER_SOURCE : (list[0] || "");
+        });
         setCompetitors([]);
       });
   }, [category]);
@@ -397,7 +407,7 @@ export default function BuyerOpportunities() {
                 <tr>
                   <th className="text-left pb-2">Concept</th>
                   <th className="text-right pb-2">Market</th>
-                  <th className="text-right pb-2">Ours</th>
+                  <th className="text-right pb-2">{buyer || "Suburbia"}</th>
                   <th className="text-right pb-2">Gap</th>
                 </tr>
               </thead>
